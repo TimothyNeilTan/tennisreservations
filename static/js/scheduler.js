@@ -2,6 +2,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const bookingForm = document.getElementById('bookingForm');
 
     if (bookingForm) {
+        // Set minimum date to tomorrow in user's timezone
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const minDate = tomorrow.toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = minDate;
+
         bookingForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -9,17 +16,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookingDate = document.getElementById('bookingDate').value;
             const bookingTime = document.getElementById('bookingTime').value;
 
-            // Validate booking date is at least today
+            // Create dates in user's timezone for comparison
             const selectedDate = new Date(bookingDate);
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset time part for date comparison
 
-            if (selectedDate < today) {
-                alert('Please select today or a future date for booking');
+            // Reset time parts for date comparison
+            selectedDate.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
+
+            // Calculate tomorrow for validation
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            if (selectedDate < tomorrow) {
+                alert('Please select tomorrow or a future date for booking');
                 return;
             }
 
-            // Combine date and time
+            // Combine date and time for the booking
             const bookingDateTime = new Date(bookingDate + 'T' + bookingTime);
 
             try {
