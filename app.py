@@ -64,8 +64,11 @@ def schedule_booking():
         # Convert ISO string to datetime object
         booking_time = datetime.fromisoformat(booking_time_str.replace('Z', '+00:00'))
 
-        # Validate booking time is in the future
-        if booking_time.date() <= datetime.now().date():
+        # Get current date/time for comparison
+        now = datetime.now()
+
+        # Validate booking time is at least tomorrow
+        if booking_time.date() < (now.date()):
             return jsonify({
                 'status': 'error',
                 'message': 'Booking must be for a future date'

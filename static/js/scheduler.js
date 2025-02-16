@@ -9,13 +9,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookingDate = document.getElementById('bookingDate').value;
             const bookingTime = document.getElementById('bookingTime').value;
 
-            // Validate booking date is in the future
+            // Validate booking date is at least today
             const selectedDate = new Date(bookingDate);
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0); // Reset time part for date comparison
 
-            if (selectedDate <= today) {
-                alert('Please select a future date for booking');
+            if (selectedDate < today) {
+                alert('Please select today or a future date for booking');
                 return;
             }
 
