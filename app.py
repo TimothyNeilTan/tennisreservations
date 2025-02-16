@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, flash, redirect, url
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from court_scraper import update_court_list
 
 # Configure logging
@@ -86,14 +87,15 @@ def schedule_booking():
         booking_time_str = data.get('booking_time')
         court_name = data.get('court_name')
 
-        # Convert ISO string to datetime object
-        booking_time = datetime.fromisoformat(booking_time_str.replace('Z', '+00:00'))
+        # Parse the ISO string as SF local time
+        sf_timezone = ZoneInfo("America/Los_Angeles")
+        booking_time = datetime.fromisoformat(booking_time_str.replace('Z', '+00:00')).astimezone(sf_timezone)
 
-        # Get current date/time for comparison
-        now = datetime.now()
+        # Get current time in SF
+        now = datetime.now(sf_timezone)
 
         # Validate booking time is at least tomorrow
-        if booking_time.date() < (now.date()):
+        if booking_time.date() <= now.date():
             return jsonify({
                 'status': 'error',
                 'message': 'Booking must be for a future date'
