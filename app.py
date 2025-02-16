@@ -3,6 +3,7 @@ import logging
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -50,16 +51,19 @@ def preferences():
         except Exception as e:
             logger.error(f"Error saving preferences: {str(e)}")
             flash('Error saving preferences', 'error')
-            
+
     return render_template('preferences.html')
 
 @app.route('/schedule-booking', methods=['POST'])
 def schedule_booking():
     try:
         data = request.get_json()
-        booking_time = data.get('booking_time')
+        booking_time_str = data.get('booking_time')
         court_name = data.get('court_name')
-        
+
+        # Convert ISO string to datetime object
+        booking_time = datetime.fromisoformat(booking_time_str.replace('Z', '+00:00'))
+
         # Create booking attempt record
         attempt = BookingAttempt(
             court_name=court_name,
@@ -68,7 +72,7 @@ def schedule_booking():
         )
         db.session.add(attempt)
         db.session.commit()
-        
+
         # Schedule the booking attempt
         scheduler.add_job(
             'booking_job',
@@ -76,7 +80,7 @@ def schedule_booking():
             run_date=booking_time,
             args=[attempt.id]
         )
-        
+
         return jsonify({'status': 'success'})
     except Exception as e:
         logger.error(f"Error scheduling booking: {str(e)}")
