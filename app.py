@@ -120,18 +120,34 @@ def schedule_booking():
         db.session.add(attempt)
         db.session.commit()
 
-        # Schedule the booking attempt
-        scheduler.add_job(
-            'booking_job',
-            'date',
-            run_date=booking_time,
-            args=[attempt.id]
-        )
+        # Schedule the booking attempt with a unique job ID
+        job_id = f'booking_{attempt.id}_{booking_time.strftime("%Y%m%d_%H%M")}'
+
+        try:
+            scheduler.add_job(
+                func='scheduler:booking_job',  # Use string reference to function
+                trigger='date',
+                run_date=booking_time,
+                args=[attempt.id],
+                id=job_id
+            )
+        except Exception as scheduler_error:
+            logger.error(f"Scheduler error: {str(scheduler_error)}")
+            attempt.status = 'failed'
+            attempt.error_message = f"Failed to schedule: {str(scheduler_error)}"
+            db.session.commit()
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to schedule booking'
+            }), 500
 
         return jsonify({'status': 'success'})
     except Exception as e:
         logger.error(f"Error scheduling booking: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)})
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 with app.app_context():
     db.create_all()
