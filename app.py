@@ -94,8 +94,18 @@ def schedule_booking():
         # Get current time in SF
         now = datetime.now(sf_timezone)
 
+        # For comparison, set both times to start of day
+        booking_date = datetime(
+            booking_time.year, booking_time.month, booking_time.day, 
+            tzinfo=sf_timezone
+        )
+        today = datetime(
+            now.year, now.month, now.day,
+            tzinfo=sf_timezone
+        )
+
         # Validate booking time is at least tomorrow
-        if booking_time.date() <= now.date():
+        if booking_date <= today:
             return jsonify({
                 'status': 'error',
                 'message': 'Booking must be for a future date'

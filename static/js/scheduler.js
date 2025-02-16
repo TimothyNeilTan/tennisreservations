@@ -16,25 +16,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookingDate = document.getElementById('bookingDate').value;
             const bookingTime = document.getElementById('bookingTime').value;
 
-            // Create dates in user's timezone for comparison
-            const selectedDate = new Date(bookingDate);
-            const today = new Date();
+            // Create dates for comparison
+            const selectedDateTime = new Date(`${bookingDate}T${bookingTime}`);
+            const now = new Date();
 
-            // Reset time parts for date comparison
+            // Set both dates to start of day for comparison
+            const selectedDate = new Date(selectedDateTime);
             selectedDate.setHours(0, 0, 0, 0);
+
+            const today = new Date(now);
             today.setHours(0, 0, 0, 0);
 
-            // Calculate tomorrow for validation
-            const tomorrow = new Date(today);
-            tomorrow.setDate(today.getDate() + 1);
-
-            if (selectedDate < tomorrow) {
-                alert('Please select tomorrow or a future date for booking');
+            if (selectedDate <= today) {
+                alert('Please select a future date for booking');
                 return;
             }
-
-            // Combine date and time for the booking
-            const bookingDateTime = new Date(bookingDate + 'T' + bookingTime);
 
             try {
                 const response = await fetch('/schedule-booking', {
@@ -44,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({
                         court_name: courtName,
-                        booking_time: bookingDateTime.toISOString()
+                        booking_time: selectedDateTime.toISOString()
                     })
                 });
 
