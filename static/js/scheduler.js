@@ -1,17 +1,27 @@
 document.addEventListener('DOMContentLoaded', function() {
     const bookingForm = document.getElementById('bookingForm');
-    
+
     if (bookingForm) {
         bookingForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const courtName = document.getElementById('courtName').value;
             const bookingDate = document.getElementById('bookingDate').value;
             const bookingTime = document.getElementById('bookingTime').value;
-            
+
+            // Validate booking date is in the future
+            const selectedDate = new Date(bookingDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (selectedDate <= today) {
+                alert('Please select a future date for booking');
+                return;
+            }
+
             // Combine date and time
             const bookingDateTime = new Date(bookingDate + 'T' + bookingTime);
-            
+
             try {
                 const response = await fetch('/schedule-booking', {
                     method: 'POST',
@@ -23,15 +33,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         booking_time: bookingDateTime.toISOString()
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     notificationManager.sendNotification(
                         'Booking Scheduled',
                         `Booking scheduled for ${courtName} at ${bookingTime} on ${bookingDate}`
                     );
-                    
+
                     // Reset form
                     bookingForm.reset();
                 } else {

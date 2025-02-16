@@ -18,12 +18,12 @@
                             <option value="Hamilton">Hamilton Recreation Center</option>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="bookingDate" class="form-label">Booking Date</label>
                         <input type="date" class="form-control" id="bookingDate" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="bookingTime" class="form-label">Preferred Time</label>
                         <select class="form-select" id="bookingTime" required>
@@ -38,7 +38,7 @@
                             <option value="16:00">4:00 PM</option>
                         </select>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-primary">Schedule Booking</button>
                 </form>
             </div>
@@ -48,5 +48,12 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Set minimum date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+    document.getElementById('bookingDate').min = minDate;
+</script>
 <script src="{{ url_for('static', filename='js/scheduler.js') }}"></script>
 {% endblock %}
