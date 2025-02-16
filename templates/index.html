@@ -13,9 +13,9 @@
                         <label for="courtName" class="form-label">Court Name</label>
                         <select class="form-select" id="courtName" required>
                             <option value="">Select a court</option>
-                            <option value="Golden Gate Park">Golden Gate Park Tennis Courts</option>
-                            <option value="Mission Dolores">Mission Dolores Tennis Courts</option>
-                            <option value="Hamilton">Hamilton Recreation Center</option>
+                            {% for court in courts %}
+                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
