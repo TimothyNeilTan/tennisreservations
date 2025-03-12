@@ -1,36 +1,106 @@
-from app import db
+from datetime import datetime
 import json
+from typing import Dict, Any, List, Optional
+from database import supabase
 
-class Court(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), unique=True, nullable=False)
-    active = db.Column(db.Boolean, default=True)
-    last_updated = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+class Court:
+    def __init__(self, name: str, active: bool = True):
+        self.name = name
+        self.active = active
+        self.last_updated = datetime.now().isoformat()
 
-class BookingPreference(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    court_name = db.Column(db.String(100), nullable=False)
-    preferred_days = db.Column(db.String(200), nullable=False)  # Stored as JSON
-    preferred_times = db.Column(db.String(200), nullable=False)  # Stored as JSON
-    rec_account_email = db.Column(db.String(120), nullable=False)
-    rec_account_password = db.Column(db.String(120), nullable=False)
+    @staticmethod
+    def get_all_active() -> List[Dict[str, Any]]:
+        """Get all active courts"""
+        response = supabase.table("courts").select("*").eq("active", True).order("name").execute()
+        return response.data
 
-    def set_preferred_days(self, days):
-        self.preferred_days = json.dumps(days)
+    @staticmethod
+    def create_or_update(name: str, active: bool = True) -> Dict[str, Any]:
+        """Create or update a court"""
+        data = {
+            "name": name,
+            "active": active,
+            "last_updated": datetime.now().isoformat()
+        }
+        # Try to update first
+        response = supabase.table("courts").upsert(data).execute()
+        return response.data[0] if response.data else None
 
-    def get_preferred_days(self):
-        return json.loads(self.preferred_days)
+class BookingPreference:
+    def __init__(self, court_name: str, preferred_days: List[str], 
+                 preferred_times: List[str], rec_account_email: str, 
+                 rec_account_password: str, phone_number: str):
+        self.court_name = court_name
+        self.preferred_days = json.dumps(preferred_days)
+        self.preferred_times = json.dumps(preferred_times)
+        self.rec_account_email = rec_account_email
+        self.rec_account_password = rec_account_password
+        self.phone_number = phone_number
 
-    def set_preferred_times(self, times):
-        self.preferred_times = json.dumps(times)
+    @staticmethod
+    def get_latest() -> Optional[Dict[str, Any]]:
+        """Get the most recent booking preference"""
+        response = supabase.table("booking_preferences").select("*").order("created_at", desc=True).limit(1).execute()
+        if not response.data:
+            return None
+            
+        pref = response.data[0]
+        # Parse JSON fields
+        try:
+            pref['preferred_days'] = json.loads(pref['preferred_days'])
+            pref['preferred_times'] = json.loads(pref['preferred_times'])
+        except (json.JSONDecodeError, KeyError):
+            # If JSON parsing fails, return empty lists
+            pref['preferred_days'] = []
+            pref['preferred_times'] = []
+        return pref
 
-    def get_preferred_times(self):
-        return json.loads(self.preferred_times)
+    def save(self) -> Dict[str, Any]:
+        """Save booking preference"""
+        data = {
+            "court_name": self.court_name,
+            "preferred_days": self.preferred_days,
+            "preferred_times": self.preferred_times,
+            "rec_account_email": self.rec_account_email,
+            "rec_account_password": self.rec_account_password,
+            "phone_number": self.phone_number,
+            "created_at": datetime.now().isoformat()
+        }
+        response = supabase.table("booking_preferences").insert(data).execute()
+        return response.data[0] if response.data else None
 
-class BookingAttempt(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    court_name = db.Column(db.String(100), nullable=False)
-    booking_time = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), nullable=False)  # scheduled, completed, failed
-    error_message = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+class BookingAttempt:
+    def __init__(self, court_name: str, booking_time: datetime, status: str = "scheduled"):
+        self.court_name = court_name
+        self.booking_time = booking_time
+        self.status = status
+        self.error_message = None
+
+    def save(self) -> Dict[str, Any]:
+        """Save booking attempt"""
+        data = {
+            "court_name": self.court_name,
+            "booking_time": self.booking_time.isoformat(),
+            "status": self.status,
+            "error_message": self.error_message,
+            "created_at": datetime.now().isoformat()
+        }
+        response = supabase.table("booking_attempts").insert(data).execute()
+        return response.data[0] if response.data else None
+
+    @staticmethod
+    def get_by_id(id: int) -> Optional[Dict[str, Any]]:
+        """Get booking attempt by ID"""
+        response = supabase.table("booking_attempts").select("*").eq("id", id).execute()
+        return response.data[0] if response.data else None
+
+    @staticmethod
+    def update_status(id: int, status: str, error_message: str = None) -> Dict[str, Any]:
+        """Update booking attempt status"""
+        data = {
+            "status": status,
+            "error_message": error_message
+        }
+        response = supabase.table("booking_attempts").update(data).eq("id", id).execute()
+        return response.data[0] if response.data else None

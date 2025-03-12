@@ -1,31 +1,21 @@
 import os
 import logging
+import json
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from court_scraper import update_court_list
+from automation import TennisBooker
+from models import Court, BookingPreference, BookingAttempt
+from database import init_db
+from extensions import scheduler
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev_key")
-
-# Configure SQLite database
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tennis_bookings.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db.init_app(app)
-
-from models import BookingPreference, BookingAttempt, Court
-from scheduler import scheduler
 
 # Initialize scheduler
 scheduler.init_app(app)
@@ -36,17 +26,13 @@ def sync_courts():
     try:
         courts = update_court_list()
         for court_name in courts:
-            court = Court.query.filter_by(name=court_name).first()
-            if not court:
-                court = Court(name=court_name)
-                db.session.add(court)
-        db.session.commit()
+            Court.create_or_update(court_name)
     except Exception as e:
         logger.error(f"Error syncing courts: {str(e)}")
 
 @app.route('/')
 def index():
-    courts = Court.query.filter_by(active=True).all()
+    courts = Court.get_all_active()
     return render_template('index.html', courts=courts)
 
 @app.route('/courts/refresh', methods=['POST'])
@@ -58,6 +44,23 @@ def refresh_courts():
         logger.error(f"Error refreshing courts: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/courts/debug', methods=['GET'])
+def debug_courts():
+    try:
+        # Get all courts from database
+        courts = Court.get_all_active()
+        
+        # Get freshly scraped courts
+        fresh_courts = update_court_list()
+        
+        return jsonify({
+            "database_courts": courts,
+            "freshly_scraped_courts": fresh_courts
+        })
+    except Exception as e:
+        logger.error(f"Error in debug courts: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/preferences', methods=['GET', 'POST'])
 def preferences():
     if request.method == 'POST':
@@ -67,18 +70,23 @@ def preferences():
                 preferred_days=request.form.getlist('preferred_days'),
                 preferred_times=request.form.getlist('preferred_times'),
                 rec_account_email=request.form['rec_account_email'],
-                rec_account_password=request.form['rec_account_password']
+                rec_account_password=request.form['rec_account_password'],
+                phone_number=request.form['phone_number']
             )
-            db.session.add(pref)
-            db.session.commit()
+            pref.save()
             flash('Preferences saved successfully!', 'success')
             return redirect(url_for('index'))
         except Exception as e:
             logger.error(f"Error saving preferences: {str(e)}")
             flash('Error saving preferences', 'error')
 
-    courts = Court.query.filter_by(active=True).all()
-    return render_template('preferences.html', courts=courts)
+    # Get the most recent preferences and courts
+    current_preferences = BookingPreference.get_latest()
+    courts = Court.get_all_active()
+    
+    return render_template('preferences.html', 
+                         courts=courts, 
+                         preferences=current_preferences)
 
 @app.route('/schedule-booking', methods=['POST'])
 def schedule_booking():
@@ -114,28 +122,30 @@ def schedule_booking():
         # Create booking attempt record
         attempt = BookingAttempt(
             court_name=court_name,
-            booking_time=booking_time,
-            status='scheduled'
+            booking_time=booking_time
         )
-        db.session.add(attempt)
-        db.session.commit()
+        attempt_data = attempt.save()
+
+        if not attempt_data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to create booking attempt'
+            }), 500
 
         # Schedule the booking attempt with a unique job ID
-        job_id = f'booking_{attempt.id}_{booking_time.strftime("%Y%m%d_%H%M")}'
+        job_id = f'booking_{attempt_data["id"]}_{booking_time.strftime("%Y%m%d_%H%M")}'
 
         try:
             scheduler.add_job(
                 func='scheduler:booking_job',  # Use string reference to function
                 trigger='date',
                 run_date=booking_time,
-                args=[attempt.id],
+                args=[attempt_data["id"]],
                 id=job_id
             )
         except Exception as scheduler_error:
             logger.error(f"Scheduler error: {str(scheduler_error)}")
-            attempt.status = 'failed'
-            attempt.error_message = f"Failed to schedule: {str(scheduler_error)}"
-            db.session.commit()
+            attempt.update_status('failed', f"Failed to schedule: {str(scheduler_error)}")
             return jsonify({
                 'status': 'error',
                 'message': 'Failed to schedule booking'
@@ -149,7 +159,79 @@ def schedule_booking():
             'message': str(e)
         }), 500
 
-with app.app_context():
-    db.create_all()
+@app.route('/get-available-times', methods=['POST'])
+def get_available_times():
+    try:
+        data = request.get_json()
+        court_name = data.get('court_name')
+        date_str = data.get('date')
+        
+        if not court_name or not date_str:
+            return jsonify({
+                'status': 'error',
+                'message': 'Court name and date are required'
+            }), 400
+            
+        # Get current date in SF timezone
+        sf_timezone = ZoneInfo("America/Los_Angeles")
+        now = datetime.now(sf_timezone)
+        today = datetime(now.year, now.month, now.day, tzinfo=sf_timezone)
+        
+        # Parse the selected date
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d')
+        selected_date = selected_date.replace(tzinfo=sf_timezone)
+        
+        # Calculate the difference in days
+        days_difference = (selected_date - today).days
+        
+        # If within a week, scrape available times
+        if days_difference <= 7:
+            # Get the most recent preferences to use credentials
+            pref = BookingPreference.get_latest()
+            
+            if not pref:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'No booking preferences found. Please set your preferences first.'
+                }), 400
+                
+            # Initialize TennisBooker with credentials
+            booker = TennisBooker(pref['rec_account_email'], pref['rec_account_password'])
+            
+            # Get available times
+            available_times = booker.get_available_times(court_name, date_str)
+            
+            return jsonify({
+                'status': 'success',
+                'times': available_times,
+                'is_scraped': True
+            })
+        else:
+            # For dates beyond a week, return standard 30-minute intervals
+            standard_times = []
+            current_time = datetime(2023, 1, 1, 9, 0)  # Start at 9:00 AM
+            end_time = datetime(2023, 1, 1, 18, 0)     # End at 6:00 PM
+            
+            while current_time <= end_time:
+                standard_times.append(current_time.strftime('%H:%M'))
+                current_time += timedelta(minutes=30)
+                
+            return jsonify({
+                'status': 'success',
+                'times': standard_times,
+                'is_scraped': False
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting available times: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+if __name__ == "__main__":
+    # Initialize database
+    init_db()
     # Sync courts on startup
     sync_courts()
+    app.run(debug=True)

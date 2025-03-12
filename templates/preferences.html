@@ -14,71 +14,139 @@
                         <select class="form-select" name="court_name" id="court_name" required>
                             <option value="">Select a court</option>
                             {% for court in courts %}
-                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            <option value="{{ court.name }}" {% if preferences and preferences.court_name == court.name %}selected{% endif %}>{{ court.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Preferred Days</label>
+                        {% set preferred_days = preferences.preferred_days if preferences else [] %}
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Monday" id="monday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Monday" id="monday" {% if "Monday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="monday">Monday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Tuesday" id="tuesday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Tuesday" id="tuesday" {% if "Tuesday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="tuesday">Tuesday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Wednesday" id="wednesday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Wednesday" id="wednesday" {% if "Wednesday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="wednesday">Wednesday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Thursday" id="thursday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Thursday" id="thursday" {% if "Thursday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="thursday">Thursday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Friday" id="friday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Friday" id="friday" {% if "Friday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="friday">Friday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Saturday" id="saturday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Saturday" id="saturday" {% if "Saturday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="saturday">Saturday</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Sunday" id="sunday">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Sunday" id="sunday" {% if "Sunday" in preferred_days %}checked{% endif %}>
                             <label class="form-check-label" for="sunday">Sunday</label>
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Preferred Times</label>
+                        {% set preferred_times = preferences.preferred_times if preferences else [] %}
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_9">
-                            <label class="form-check-label" for="time_9">9:00 AM</label>
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_900" {% if "09:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_900">9:00 AM</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_10">
-                            <label class="form-check-label" for="time_10">10:00 AM</label>
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:30" id="time_930" {% if "09:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_930">9:30 AM</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_11">
-                            <label class="form-check-label" for="time_11">11:00 AM</label>
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_1000" {% if "10:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1000">10:00 AM</label>
                         </div>
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_12">
-                            <label class="form-check-label" for="time_12">12:00 PM</label>
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:30" id="time_1030" {% if "10:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1030">10:30 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_1100" {% if "11:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1100">11:00 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:30" id="time_1130" {% if "11:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1130">11:30 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_1200" {% if "12:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1200">12:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:30" id="time_1230" {% if "12:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1230">12:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:00" id="time_1300" {% if "13:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1300">1:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:30" id="time_1330" {% if "13:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1330">1:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:00" id="time_1400" {% if "14:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1400">2:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:30" id="time_1430" {% if "14:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1430">2:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:00" id="time_1500" {% if "15:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1500">3:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:30" id="time_1530" {% if "15:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1530">3:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:00" id="time_1600" {% if "16:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1600">4:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:30" id="time_1630" {% if "16:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1630">4:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:00" id="time_1700" {% if "17:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1700">5:00 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:30" id="time_1730" {% if "17:30" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1730">5:30 PM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="18:00" id="time_1800" {% if "18:00" in preferred_times %}checked{% endif %}>
+                            <label class="form-check-label" for="time_1800">6:00 PM</label>
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <label for="rec_account_email" class="form-label">Rec & Park Account Email</label>
-                        <input type="email" class="form-control" name="rec_account_email" id="rec_account_email" required>
+                        <input type="email" class="form-control" name="rec_account_email" id="rec_account_email" required value="{{ preferences.rec_account_email if preferences else '' }}">
                     </div>
 
                     <div class="mb-3">
                         <label for="rec_account_password" class="form-label">Rec & Park Account Password</label>
-                        <input type="password" class="form-control" name="rec_account_password" id="rec_account_password" required>
+                        <input type="password" class="form-control" name="rec_account_password" id="rec_account_password" required value="{{ preferences.rec_account_password if preferences else '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="phone_number" class="form-label">Phone Number (for verification)</label>
+                        <input type="tel" class="form-control" name="phone_number" id="phone_number" required pattern="[0-9]{10}" placeholder="1234567890" value="{{ preferences.phone_number if preferences else '' }}">
+                        <small class="form-text text-muted">Enter your 10-digit phone number without spaces or special characters</small>
                     </div>
 
                     <button type="submit" class="btn btn-primary">Save Preferences</button>

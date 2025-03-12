@@ -18,17 +18,17 @@ def get_sf_tennis_courts() -> List[str]:
             # Fallback to default list if scraping fails
             logger.warning("Failed to scrape courts, using default list")
             courts = [
-                "Golden Gate Park Tennis Courts",
-                "Mission Dolores Tennis Courts",
-                "Hamilton Recreation Center",
-                "Alice Marble Tennis Courts",
-                "Moscone Recreation Center",
-                "Julius Kahn Playground",
-                "Upper Noe Recreation Center",
-                "JP Murphy Playground",
+                "Alice Marble",
+                "Dolores",
+                "Hamilton",
+                "Moscone",
+                "Upper Noe",
+                "J.P. Murphy",
                 "Parkside Square",
-                "St. Mary's Recreation Center",
-                "Mountain Lake Park"
+                "St. Mary's",
+                "Mountain Lake",
+                "Balboa",
+                "Buena Vista"
             ]
 
         return courts
@@ -44,8 +44,8 @@ def update_court_list() -> List[str]:
     if not courts:
         # Fallback to minimum default list if scraping fails
         courts = [
-            "Golden Gate Park Tennis Courts",
-            "Mission Dolores Tennis Courts",
-            "Hamilton Recreation Center"
+            "Alice Marble",
+            "Dolores",
+            "Hamilton"
         ]
     return courts
