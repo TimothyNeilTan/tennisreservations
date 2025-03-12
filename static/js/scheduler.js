@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', function() {
     const bookingForm = document.getElementById('bookingForm');
 
@@ -33,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const response = await fetch('/schedule-booking', {
+                const response = await fetch('/book-now', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -48,18 +49,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (data.status === 'success') {
                     notificationManager.sendNotification(
-                        'Booking Scheduled',
-                        `Booking scheduled for ${courtName} at ${bookingTime} on ${bookingDate}`
+                        'Booking Submitted',
+                        `Booking attempt for ${courtName} at ${bookingTime} on ${bookingDate} was ${data.message}`
                     );
-
-                    // Reset form
                     bookingForm.reset();
                 } else {
-                    alert('Error scheduling booking: ' + data.message);
+                    alert('Booking failed: ' + data.message);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error scheduling booking');
+                alert('Error submitting booking');
             }
         });
     }
