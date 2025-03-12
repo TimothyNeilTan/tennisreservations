@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>Booking Preferences</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="court_name" class="form-label">Preferred Court</label>
+                        <select class="form-select" name="court_name" id="court_name" required>
+                            <option value="">Select a court</option>
+                            {% for court in courts %}
+                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Preferred Days</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Monday" id="monday">
+                            <label class="form-check-label" for="monday">Monday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Tuesday" id="tuesday">
+                            <label class="form-check-label" for="tuesday">Tuesday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Wednesday" id="wednesday">
+                            <label class="form-check-label" for="wednesday">Wednesday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Thursday" id="thursday">
+                            <label class="form-check-label" for="thursday">Thursday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Friday" id="friday">
+                            <label class="form-check-label" for="friday">Friday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Saturday" id="saturday">
+                            <label class="form-check-label" for="saturday">Saturday</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_days" value="Sunday" id="sunday">
+                            <label class="form-check-label" for="sunday">Sunday</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Preferred Times</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_9">
+                            <label class="form-check-label" for="time_9">9:00 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_10">
+                            <label class="form-check-label" for="time_10">10:00 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_11">
+                            <label class="form-check-label" for="time_11">11:00 AM</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_12">
+                            <label class="form-check-label" for="time_12">12:00 PM</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="rec_account_email" class="form-label">Rec & Park Account Email</label>
+                        <input type="email" class="form-control" name="rec_account_email" id="rec_account_email" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="rec_account_password" class="form-label">Rec & Park Account Password</label>
+                        <input type="password" class="form-control" name="rec_account_password" id="rec_account_password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>Schedule Tennis Court Booking</h4>
+            </div>
+            <div class="card-body">
+                <form id="bookingForm">
+                    <div class="mb-3">
+                        <label for="courtName" class="form-label">Court Name</label>
+                        <select class="form-select" id="courtName" required>
+                            <option value="">Select a court</option>
+                            {% for court in courts %}
+                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bookingDate" class="form-label">Booking Date</label>
+                        <input type="date" class="form-control" id="bookingDate" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bookingTime" class="form-label">Preferred Time</label>
+                        <select class="form-select" id="bookingTime" required>
+                            <option value="">Select time</option>
+                            <option value="09:00">9:00 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="12:00">12:00 PM</option>
+                            <option value="13:00">1:00 PM</option>
+                            <option value="14:00">2:00 PM</option>
+                            <option value="15:00">3:00 PM</option>
+                            <option value="16:00">4:00 PM</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Schedule Booking</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set minimum date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+    document.getElementById('bookingDate').min = minDate;
+</script>
+<script src="{{ url_for('static', filename='js/scheduler.js') }}"></script>
+{% endblock %}
