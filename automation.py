@@ -145,56 +145,193 @@ class TennisBooker:
             List of available time slots in HH:MM format (24-hour)
         """
         try:
+            logger.info(f"Getting available times for {court_name} on {date_str}")
+            
             with sync_playwright() as playwright:
-                # Launch browser
+                # Launch browser with stealth mode to avoid detection
                 browser = playwright.chromium.launch(headless=True)
-                context = browser.new_context()
+                context = browser.new_context(
+                    viewport={"width": 1280, "height": 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                )
                 page = context.new_page()
-
-                # Go to SF Rec & Park page (no login needed to view available times)
+                
+                # Apply stealth mode
+                stealth_sync(page)
+                
+                # Go to SF Rec & Park page
+                logger.debug("Navigating to SF Rec & Park page")
                 page.goto("https://www.rec.us/organizations/san-francisco-rec-park")
                 
+                # Wait for page to load completely
+                page.wait_for_load_state("networkidle")
+                
                 # Find and click on the specific court
-                court_selector = f'//p[contains(text(), "{court_name}")]'
-                page.wait_for_selector(court_selector, state="visible")
-                page.click(court_selector)
-
+                logger.debug(f"Looking for court: {court_name}")
+                
+                # Try different selectors to find the court
+                court_found = False
+                
+                # First try exact match
+                try:
+                    exact_selector = f'//p[text()="{court_name}"]'
+                    if page.is_visible(exact_selector, timeout=2000):
+                        logger.debug(f"Found court with exact match: {court_name}")
+                        page.click(exact_selector)
+                        court_found = True
+                except:
+                    logger.debug(f"Court not found with exact match, trying contains")
+                
+                # Then try contains
+                if not court_found:
+                    try:
+                        contains_selector = f'//p[contains(text(), "{court_name}")]'
+                        if page.is_visible(contains_selector, timeout=2000):
+                            logger.debug(f"Found court with contains: {court_name}")
+                            page.click(contains_selector)
+                            court_found = True
+                    except:
+                        logger.debug(f"Court not found with contains, trying parent element")
+                
+                # Try clicking on parent element
+                if not court_found:
+                    try:
+                        parent_selector = f'//a[.//p[contains(text(), "{court_name}")]]'
+                        if page.is_visible(parent_selector, timeout=2000):
+                            logger.debug(f"Found court with parent selector: {court_name}")
+                            page.click(parent_selector)
+                            court_found = True
+                    except:
+                        logger.error(f"Could not find court: {court_name}")
+                        return []
+                
                 # Wait for calendar to load
-                page.wait_for_selector('.calendar-day', state="visible")
-
+                logger.debug("Waiting for calendar to load")
+                page.wait_for_selector('div[role="grid"]', state="visible", timeout=10000)
+                
                 # Click on the date
-                date_selector = f'[data-date="{date_str}"]'
-                page.wait_for_selector(date_selector)
-                page.click(date_selector)
-
+                logger.debug(f"Selecting date: {date_str}")
+                
+                # Try different date selector formats
+                date_selectors = [
+                    f'[data-date="{date_str}"]',
+                    f'//div[@role="gridcell" and @data-date="{date_str}"]',
+                    f'//div[@role="gridcell" and contains(@aria-label, "{date_str}")]',
+                    f'//button[contains(@aria-label, "{date_str}")]'
+                ]
+                
+                date_clicked = False
+                for selector in date_selectors:
+                    try:
+                        if page.is_visible(selector, timeout=2000):
+                            page.click(selector)
+                            date_clicked = True
+                            logger.debug(f"Successfully clicked date with selector: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if not date_clicked:
+                    logger.error(f"Could not find date selector for: {date_str}")
+                    
+                    # Take a screenshot for debugging
+                    page.screenshot(path="calendar_debug.png")
+                    logger.debug("Saved calendar screenshot for debugging")
+                    
+                    # Try to navigate by clicking on the correct date in the calendar
+                    try:
+                        # Parse the date components
+                        year, month, day = date_str.split('-')
+                        day_int = int(day)
+                        
+                        # Try clicking on the day number directly
+                        day_selector = f'//div[@role="gridcell"]//span[text()="{day_int}"]'
+                        if page.is_visible(day_selector, timeout=2000):
+                            page.click(day_selector)
+                            date_clicked = True
+                            logger.debug(f"Clicked on day number: {day_int}")
+                    except:
+                        logger.error("Failed to click on day number")
+                
                 # Wait for time slots to load
-                page.wait_for_selector('.time-slot', state="visible", timeout=5000)
+                logger.debug("Waiting for time slots to load")
+                
+                # Try different selectors for time slots
+                time_slot_selectors = [
+                    'button.time-slot',
+                    'button[data-testid="time-slot"]',
+                    'div.time-slot button',
+                    'button[aria-label*="time slot"]',
+                    'button:has-text("AM")',
+                    'button:has-text("PM")'
+                ]
+                
+                time_slots_visible = False
+                for selector in time_slot_selectors:
+                    try:
+                        if page.is_visible(selector, timeout=2000):
+                            time_slots_visible = True
+                            logger.debug(f"Time slots visible with selector: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if not time_slots_visible:
+                    logger.error("Time slots not visible")
+                    page.screenshot(path="timeslots_debug.png")
+                    logger.debug("Saved time slots screenshot for debugging")
+                    return []
                 
                 # Get all available time slots
+                logger.debug("Getting time slots content")
                 time_slots_html = page.content()
                 soup = BeautifulSoup(time_slots_html, "html.parser")
                 
-                # Find all time slot buttons that are not disabled
+                # Try different selectors to find available time slots
+                available_times = []
+                
+                # First try the standard selector
                 time_slots = soup.select('button.time-slot:not([disabled])')
+                if not time_slots:
+                    # Try alternative selectors
+                    time_slots = soup.select('button[data-testid="time-slot"]:not([disabled])')
+                
+                if not time_slots:
+                    # Try to find any button with time text
+                    time_slots = soup.select('button:not([disabled])')
+                    # Filter to only include buttons that have time text (e.g., "9:00 AM")
+                    time_slots = [slot for slot in time_slots if any(x in slot.get_text() for x in ["AM", "PM"])]
+                
+                logger.debug(f"Found {len(time_slots)} available time slots")
                 
                 # Extract the time text and convert to 24-hour format
-                available_times = []
                 for slot in time_slots:
                     time_text = slot.get_text(strip=True)
-                    # Convert from "9:00 AM" format to "09:00" format
-                    if "AM" in time_text:
-                        hour = time_text.split(':')[0]
-                        minute = time_text.split(':')[1].split(' ')[0]
-                        if len(hour) == 1:
-                            hour = f"0{hour}"
-                        available_times.append(f"{hour}:{minute}")
-                    elif "PM" in time_text:
-                        hour = int(time_text.split(':')[0])
-                        if hour < 12:
-                            hour += 12
-                        minute = time_text.split(':')[1].split(' ')[0]
-                        available_times.append(f"{hour}:{minute}")
+                    logger.debug(f"Processing time slot: {time_text}")
+                    
+                    # Try to extract time in format like "9:00 AM"
+                    if ":" in time_text and ("AM" in time_text or "PM" in time_text):
+                        try:
+                            # Split by space to handle formats like "9:00 AM - 10:00 AM"
+                            # Just take the start time
+                            time_parts = time_text.split(" - ")[0].strip()
+                            
+                            if "AM" in time_parts:
+                                hour = time_parts.split(':')[0]
+                                minute = time_parts.split(':')[1].split(' ')[0]
+                                if len(hour) == 1:
+                                    hour = f"0{hour}"
+                                available_times.append(f"{hour}:{minute}")
+                            elif "PM" in time_parts:
+                                hour = int(time_parts.split(':')[0])
+                                if hour < 12:
+                                    hour += 12
+                                minute = time_parts.split(':')[1].split(' ')[0]
+                                available_times.append(f"{hour}:{minute}")
+                        except Exception as e:
+                            logger.error(f"Error parsing time text '{time_text}': {str(e)}")
                 
+                logger.info(f"Found {len(available_times)} available times: {available_times}")
                 return available_times
 
         except Exception as e:

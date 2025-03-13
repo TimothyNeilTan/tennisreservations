@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime
 import json
 from typing import Dict, Any, List, Optional
 from database import supabase
+
+logger = logging.getLogger(__name__)
 
 class Court:
     def __init__(self, name: str, active: bool = True):
@@ -12,20 +15,45 @@ class Court:
     @staticmethod
     def get_all_active() -> List[Dict[str, Any]]:
         """Get all active courts"""
-        response = supabase.table("courts").select("*").eq("active", True).order("name").execute()
-        return response.data
+        try:
+            response = supabase.table("courts").select("*").eq("active", True).order("name").execute()
+            logger.debug(f"Retrieved {len(response.data)} active courts")
+            return response.data
+        except Exception as e:
+            logger.error(f"Error retrieving active courts: {str(e)}")
+            return []
 
     @staticmethod
     def create_or_update(name: str, active: bool = True) -> Dict[str, Any]:
         """Create or update a court"""
-        data = {
-            "name": name,
-            "active": active,
-            "last_updated": datetime.now().isoformat()
-        }
-        # Try to update first
-        response = supabase.table("courts").upsert(data).execute()
-        return response.data[0] if response.data else None
+        try:
+            logger.debug(f"Creating/updating court: {name}")
+            data = {
+                "name": name,
+                "active": active,
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            # Check if court exists
+            logger.debug(f"Checking if court exists: {name}")
+            existing = supabase.table("courts").select("*").eq("name", name).execute()
+            
+            if existing.data:
+                logger.debug(f"Updating existing court: {name}")
+                response = supabase.table("courts").update(data).eq("name", name).execute()
+            else:
+                logger.debug(f"Inserting new court: {name}")
+                response = supabase.table("courts").insert(data).execute()
+            
+            if not response.data:
+                raise Exception("No data returned from database operation")
+            
+            logger.info(f"Successfully created/updated court {name}")
+            return response.data[0]
+        except Exception as e:
+            error_msg = f"Error creating/updating court {name}: {str(e)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
 
 class BookingPreference:
     def __init__(self, court_name: str, preferred_days: List[str], 

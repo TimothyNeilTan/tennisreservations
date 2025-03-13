@@ -24,11 +24,44 @@ scheduler.start()
 def sync_courts():
     """Synchronize courts from scraper with database"""
     try:
+        logger.info("Starting court synchronization...")
+        
+        # Get courts from scraper
         courts = update_court_list()
+        
+        # Fallback court list if scraper returns empty
+        fallback_courts = [
+            "Golden Gate Park Tennis Courts",
+            "Alice Marble Tennis Courts",
+            "JP Murphy Playground Tennis Courts",
+            "Moscone Recreation Center Tennis Courts",
+            "Hamilton Recreation Center Tennis Courts"
+        ]
+        
+        if not courts:
+            logger.warning("No courts returned from scraper, using fallback list")
+            courts = fallback_courts
+        
+        logger.info(f"Retrieved {len(courts)} courts to sync: {courts}")
+        
+        # Track successful insertions
+        success_count = 0
+        
+        # Sync each court
         for court_name in courts:
-            Court.create_or_update(court_name)
+            try:
+                logger.debug(f"Attempting to sync court: {court_name}")
+                result = Court.create_or_update(court_name)
+                success_count += 1
+                logger.info(f"Successfully synced court: {court_name} - Result: {result}")
+            except Exception as court_error:
+                logger.error(f"Error syncing individual court {court_name}: {str(court_error)}")
+        
+        logger.info(f"Court synchronization completed. Successfully synced {success_count}/{len(courts)} courts.")
+        return True
     except Exception as e:
-        logger.error(f"Error syncing courts: {str(e)}")
+        logger.error(f"Error in court synchronization: {str(e)}")
+        return False
 
 @app.route('/')
 def index():
