@@ -55,81 +55,183 @@
                     <div class="mb-3">
                         <label class="form-label">Preferred Times</label>
                         {% set preferred_times = preferences.preferred_times if preferences else [] %}
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_900" {% if "09:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_900">9:00 AM</label>
+                        
+                        <!-- Available Times Section -->
+                        <div class="card mb-3 border-info">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <span>Available Times for Tomorrow ({{ tomorrow_date }})</span>
+                                <button type="button" id="refreshAvailableTimes" class="btn btn-sm btn-light">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="availableTimesLoading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading available times...</p>
+                                </div>
+                                <div id="availableTimesError" class="alert alert-warning" style="display: none;">
+                                    No available times found. Please select a court and ensure your credentials are correct.
+                                </div>
+                                <div id="availableTimesList">
+                                    {% if available_times %}
+                                        <p class="text-success">Found {{ available_times|length }} available times for {{ preferences.court_name }}</p>
+                                        <div class="row">
+                                            {% for time in available_times %}
+                                                <div class="col-md-3 mb-2">
+                                                    <div class="form-check">
+                                                        <input type="checkbox" class="form-check-input available-time" 
+                                                               id="available_{{ time }}" 
+                                                               name="preferred_times"
+                                                               value="{{ time }}"
+                                                               data-time="{{ time }}"
+                                                               {% if time in preferred_times %}checked{% endif %}>
+                                                        <label class="form-check-label" for="available_{{ time }}">
+                                                            {% set hour, minute = time.split(':') %}
+                                                            {% set hour_int = hour|int %}
+                                                            {% if hour_int < 12 %}
+                                                                {{ hour }}:{{ minute }} AM
+                                                            {% elif hour_int == 12 %}
+                                                                {{ hour }}:{{ minute }} PM
+                                                            {% else %}
+                                                                {{ hour_int - 12 }}:{{ minute }} PM
+                                                            {% endif %}
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        <button type="button" id="selectAllAvailable" class="btn btn-sm btn-outline-primary mt-2">Select All Available</button>
+                                        <button type="button" id="clearAllAvailable" class="btn btn-sm btn-outline-secondary mt-2">Clear All</button>
+                                    {% else %}
+                                        <p class="text-muted">Select a court to see available times for tomorrow.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:30" id="time_930" {% if "09:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_930">9:30 AM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_1000" {% if "10:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1000">10:00 AM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:30" id="time_1030" {% if "10:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1030">10:30 AM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_1100" {% if "11:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1100">11:00 AM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:30" id="time_1130" {% if "11:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1130">11:30 AM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_1200" {% if "12:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1200">12:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:30" id="time_1230" {% if "12:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1230">12:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:00" id="time_1300" {% if "13:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1300">1:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:30" id="time_1330" {% if "13:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1330">1:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:00" id="time_1400" {% if "14:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1400">2:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:30" id="time_1430" {% if "14:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1430">2:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:00" id="time_1500" {% if "15:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1500">3:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:30" id="time_1530" {% if "15:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1530">3:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:00" id="time_1600" {% if "16:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1600">4:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:30" id="time_1630" {% if "16:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1630">4:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:00" id="time_1700" {% if "17:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1700">5:00 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:30" id="time_1730" {% if "17:30" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1730">5:30 PM</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" name="preferred_times" value="18:00" id="time_1800" {% if "18:00" in preferred_times %}checked{% endif %}>
-                            <label class="form-check-label" for="time_1800">6:00 PM</label>
+                        
+                        <!-- Standard Time Options -->
+                        <div class="card mb-3">
+                            <div class="card-header">Standard Time Options</div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_900" {% if "09:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_900">9:00 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:30" id="time_930" {% if "09:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_930">9:30 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_1000" {% if "10:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1000">10:00 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:30" id="time_1030" {% if "10:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1030">10:30 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_1100" {% if "11:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1100">11:00 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:30" id="time_1130" {% if "11:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1130">11:30 AM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_1200" {% if "12:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1200">12:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:30" id="time_1230" {% if "12:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1230">12:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:00" id="time_1300" {% if "13:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1300">1:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:30" id="time_1330" {% if "13:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1330">1:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:00" id="time_1400" {% if "14:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1400">2:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:30" id="time_1430" {% if "14:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1430">2:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:00" id="time_1500" {% if "15:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1500">3:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:30" id="time_1530" {% if "15:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1530">3:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:00" id="time_1600" {% if "16:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1600">4:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:30" id="time_1630" {% if "16:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1630">4:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:00" id="time_1700" {% if "17:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1700">5:00 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:30" id="time_1730" {% if "17:30" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1730">5:30 PM</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="18:00" id="time_1800" {% if "18:00" in preferred_times %}checked{% endif %}>
+                                            <label class="form-check-label" for="time_1800">6:00 PM</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -155,4 +257,125 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const courtSelect = document.getElementById('court_name');
+        const refreshButton = document.getElementById('refreshAvailableTimes');
+        const selectAllButton = document.getElementById('selectAllAvailable');
+        const clearAllButton = document.getElementById('clearAllAvailable');
+        
+        // Function to load available times for the selected court
+        async function loadAvailableTimes() {
+            const courtName = courtSelect.value;
+            
+            if (!courtName) {
+                document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court to see available times for tomorrow.</p>';
+                document.getElementById('availableTimesError').style.display = 'none';
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('availableTimesLoading').style.display = 'block';
+            document.getElementById('availableTimesError').style.display = 'none';
+            document.getElementById('availableTimesList').innerHTML = '';
+            
+            try {
+                const response = await fetch('/get-available-times-for-preferences', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                
+                if (data.status === 'success' && data.times && data.times.length > 0) {
+                    // Get current preferred times
+                    const preferredTimes = Array.from(document.querySelectorAll('input[name="preferred_times"]:checked')).map(input => input.value);
+                    
+                    // Create HTML for available times
+                    let html = `<p class="text-success">Found ${data.times.length} available times for ${courtName} on ${data.date}</p>`;
+                    html += '<div class="row">';
+                    
+                    data.times.forEach(time => {
+                        const [hours, minutes] = time.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                        
+                        html += `
+                            <div class="col-md-3 mb-2">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input available-time" 
+                                           id="available_${time}" 
+                                           name="preferred_times" 
+                                           value="${time}"
+                                           data-time="${time}"
+                                           ${preferredTimes.includes(time) ? 'checked' : ''}>
+                                    <label class="form-check-label" for="available_${time}">
+                                        ${displayTime}
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    html += '<button type="button" id="selectAllAvailable" class="btn btn-sm btn-outline-primary mt-2">Select All Available</button> ';
+                    html += '<button type="button" id="clearAllAvailable" class="btn btn-sm btn-outline-secondary mt-2">Clear All</button>';
+                    
+                    document.getElementById('availableTimesList').innerHTML = html;
+                    
+                    // Re-attach event listeners to the new buttons
+                    document.getElementById('selectAllAvailable').addEventListener('click', selectAllAvailableTimes);
+                    document.getElementById('clearAllAvailable').addEventListener('click', clearAllAvailableTimes);
+                } else {
+                    document.getElementById('availableTimesError').style.display = 'block';
+                    document.getElementById('availableTimesList').innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error loading available times:', error);
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                document.getElementById('availableTimesError').style.display = 'block';
+                document.getElementById('availableTimesList').innerHTML = '';
+            }
+        }
+        
+        // Function to select all available times
+        function selectAllAvailableTimes() {
+            document.querySelectorAll('.available-time').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        }
+        
+        // Function to clear all available times
+        function clearAllAvailableTimes() {
+            document.querySelectorAll('.available-time').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+        
+        // Add event listeners
+        courtSelect.addEventListener('change', loadAvailableTimes);
+        refreshButton.addEventListener('click', loadAvailableTimes);
+        
+        if (selectAllButton) {
+            selectAllButton.addEventListener('click', selectAllAvailableTimes);
+        }
+        
+        if (clearAllButton) {
+            clearAllButton.addEventListener('click', clearAllAvailableTimes);
+        }
+    });
+</script>
 {% endblock %}

@@ -117,9 +117,33 @@ def preferences():
     current_preferences = BookingPreference.get_latest()
     courts = Court.get_all_active()
     
+    # Get tomorrow's date for available times
+    sf_timezone = ZoneInfo("America/Los_Angeles")
+    now = datetime.now(sf_timezone)
+    tomorrow = now + timedelta(days=1)
+    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+    
+    # Get available times for the preferred court if one is set
+    available_times = []
+    if current_preferences and current_preferences.get('court_name'):
+        try:
+            # Initialize TennisBooker with credentials
+            booker = TennisBooker(
+                current_preferences.get('rec_account_email', ''),
+                current_preferences.get('rec_account_password', '')
+            )
+            
+            # Get available times for tomorrow
+            available_times = booker.get_available_times(current_preferences.get('court_name'), tomorrow_str)
+            logger.info(f"Found {len(available_times)} available times for {current_preferences.get('court_name')} on {tomorrow_str}")
+        except Exception as e:
+            logger.error(f"Error getting available times: {str(e)}")
+    
     return render_template('preferences.html', 
                          courts=courts, 
-                         preferences=current_preferences)
+                         preferences=current_preferences,
+                         available_times=available_times,
+                         tomorrow_date=tomorrow_str)
 
 @app.route('/schedule-booking', methods=['POST'])
 def schedule_booking():
@@ -257,6 +281,57 @@ def get_available_times():
             
     except Exception as e:
         logger.error(f"Error getting available times: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/get-available-times-for-preferences', methods=['POST'])
+def get_available_times_for_preferences():
+    try:
+        data = request.get_json()
+        court_name = data.get('court_name')
+        
+        if not court_name:
+            return jsonify({
+                'status': 'error',
+                'message': 'Court name is required'
+            }), 400
+            
+        # Get tomorrow's date
+        sf_timezone = ZoneInfo("America/Los_Angeles")
+        now = datetime.now(sf_timezone)
+        tomorrow = now + timedelta(days=1)
+        tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+        
+        # Get the most recent preferences to use credentials
+        pref = BookingPreference.get_latest()
+        
+        if not pref:
+            return jsonify({
+                'status': 'error',
+                'message': 'No booking preferences found. Please set your preferences first.'
+            }), 400
+            
+        # Initialize TennisBooker with credentials
+        booker = TennisBooker(pref['rec_account_email'], pref['rec_account_password'])
+        
+        # Get available times
+        logger.info(f"Getting available times for preferences: {court_name} on {tomorrow_str}")
+        available_times = booker.get_available_times(court_name, tomorrow_str)
+        
+        if not available_times:
+            logger.warning(f"No available times found for {court_name} on {tomorrow_str}")
+            
+        logger.info(f"Found {len(available_times)} available times")
+        return jsonify({
+            'status': 'success',
+            'times': available_times,
+            'date': tomorrow_str
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting available times for preferences: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
