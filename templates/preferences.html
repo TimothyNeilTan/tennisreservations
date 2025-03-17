@@ -1,6 +1,103 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    /* Styling for the scrolling time picker */
+    .time-picker-container {
+        display: flex;
+        align-items: center;
+    }
+    
+    .time-picker-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 0.5rem;
+        text-align: center;
+        cursor: pointer;
+        max-height: 38px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        color: #495057;
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    
+    .time-picker-select::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .time-picker-select::-webkit-scrollbar-thumb {
+        background-color: #adb5bd;
+        border-radius: 3px;
+    }
+    
+    .time-picker-select:focus {
+        border-color: #80bdff;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .time-picker-label {
+        font-weight: bold;
+        margin-bottom: 0;
+        text-align: center;
+        color: #495057;
+        font-size: 0.85rem;
+    }
+    
+    .time-item {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .time-item:hover {
+        background-color: #ffffff;
+    }
+    
+    .time-separator {
+        color: #495057;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .playtime-option {
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .playtime-option:hover {
+        background-color: #e9ecef;
+    }
+    
+    .playtime-option.selected {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    
+    .playtime-option .duration {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    
+    .playtime-option .unit {
+        font-size: 0.9rem;
+        display: block;
+    }
+</style>
+
 <div class="row">
     <div class="col-md-8 offset-md-2">
         <div class="card">
@@ -56,180 +153,53 @@
                         <label class="form-label">Preferred Times</label>
                         {% set preferred_times = preferences.preferred_times if preferences else [] %}
                         
-                        <!-- Available Times Section -->
-                        <div class="card mb-3 border-info">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                                <span>Available Times for Tomorrow ({{ tomorrow_date }})</span>
-                                <button type="button" id="refreshAvailableTimes" class="btn btn-sm btn-light">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
+                        <!-- Individual Time Selections -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Preferred Time Slots</span>
+                                <button type="button" class="btn btn-sm btn-primary" id="add-time">Add Time Slot</button>
                             </div>
                             <div class="card-body">
-                                <div id="availableTimesLoading" class="text-center" style="display: none;">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p>Loading available times...</p>
+                                <div id="time-selections-container" class="mb-3">
+                                    <!-- Time selections will be added here dynamically -->
                                 </div>
-                                <div id="availableTimesError" class="alert alert-warning" style="display: none;">
-                                    No available times found. Please select a court and ensure your credentials are correct.
-                                </div>
-                                <div id="availableTimesList">
-                                    {% if available_times %}
-                                        <p class="text-success">Found {{ available_times|length }} available times for {{ preferences.court_name }}</p>
-                                        <div class="row">
-                                            {% for time in available_times %}
-                                                <div class="col-md-3 mb-2">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input available-time" 
-                                                               id="available_{{ time }}" 
-                                                               name="preferred_times"
-                                                               value="{{ time }}"
-                                                               data-time="{{ time }}"
-                                                               {% if time in preferred_times %}checked{% endif %}>
-                                                        <label class="form-check-label" for="available_{{ time }}">
-                                                            {% set hour, minute = time.split(':') %}
-                                                            {% set hour_int = hour|int %}
-                                                            {% if hour_int < 12 %}
-                                                                {{ hour }}:{{ minute }} AM
-                                                            {% elif hour_int == 12 %}
-                                                                {{ hour }}:{{ minute }} PM
-                                                            {% else %}
-                                                                {{ hour_int - 12 }}:{{ minute }} PM
-                                                            {% endif %}
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            {% endfor %}
-                                        </div>
-                                        <button type="button" id="selectAllAvailable" class="btn btn-sm btn-outline-primary mt-2">Select All Available</button>
-                                        <button type="button" id="clearAllAvailable" class="btn btn-sm btn-outline-secondary mt-2">Clear All</button>
-                                    {% else %}
-                                        <p class="text-muted">Select a court to see available times for tomorrow.</p>
-                                    {% endif %}
+                                
+                                <!-- Hidden input to store all selected times -->
+                                <input type="hidden" id="all-preferred-times" name="preferred_times" value="{{ preferred_times|join(',') if preferred_times else '' }}">
+                                
+                                <div class="alert alert-info mt-3" role="alert">
+                                    <small>Add up to 3 specific time slots when you prefer to play. Use the scrolling selectors to pick hour, minute, and AM/PM. The system will try to book courts at these exact times.</small>
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Preferred Playtime Duration</label>
                         
-                        <!-- Standard Time Options -->
+                        <!-- Playtime Duration Selection -->
                         <div class="card mb-3">
-                            <div class="card-header">Standard Time Options</div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:00" id="time_900" {% if "09:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_900">9:00 AM</label>
+                                <div class="row justify-content-center">
+                                    <div class="col-md-5 mb-2">
+                                        <div class="playtime-option {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}" data-duration="60">
+                                            <span class="duration">60</span>
+                                            <span class="unit">minutes</span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="09:30" id="time_930" {% if "09:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_930">9:30 AM</label>
+                                    <div class="col-md-5 mb-2">
+                                        <div class="playtime-option {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}" data-duration="90">
+                                            <span class="duration">90</span>
+                                            <span class="unit">minutes</span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:00" id="time_1000" {% if "10:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1000">10:00 AM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="10:30" id="time_1030" {% if "10:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1030">10:30 AM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:00" id="time_1100" {% if "11:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1100">11:00 AM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="11:30" id="time_1130" {% if "11:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1130">11:30 AM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:00" id="time_1200" {% if "12:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1200">12:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="12:30" id="time_1230" {% if "12:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1230">12:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:00" id="time_1300" {% if "13:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1300">1:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="13:30" id="time_1330" {% if "13:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1330">1:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:00" id="time_1400" {% if "14:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1400">2:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="14:30" id="time_1430" {% if "14:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1430">2:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:00" id="time_1500" {% if "15:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1500">3:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="15:30" id="time_1530" {% if "15:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1530">3:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:00" id="time_1600" {% if "16:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1600">4:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="16:30" id="time_1630" {% if "16:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1630">4:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:00" id="time_1700" {% if "17:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1700">5:00 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="17:30" id="time_1730" {% if "17:30" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1730">5:30 PM</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="preferred_times" value="18:00" id="time_1800" {% if "18:00" in preferred_times %}checked{% endif %}>
-                                            <label class="form-check-label" for="time_1800">6:00 PM</label>
-                                        </div>
-                                    </div>
+                                </div>
+                                
+                                <!-- Hidden input to store the selected playtime duration -->
+                                <input type="hidden" id="playtime-duration" name="playtime_duration" value="{{ preferences.playtime_duration if preferences and preferences.playtime_duration else '60' }}">
+                                
+                                <div class="alert alert-info mt-3" role="alert">
+                                    <small>Select your preferred playtime duration. The system will attempt to book courts for this amount of time.</small>
                                 </div>
                             </div>
                         </div>
@@ -237,17 +207,23 @@
 
                     <div class="mb-3">
                         <label for="rec_account_email" class="form-label">Rec & Park Account Email</label>
-                        <input type="email" class="form-control" name="rec_account_email" id="rec_account_email" required value="{{ preferences.rec_account_email if preferences else '' }}">
+                        <input type="email" class="form-control" name="rec_account_email" id="rec_account_email" required 
+                               placeholder="test@example.com" 
+                               value="{% if preferences and preferences.rec_account_email != 'test@example.com' %}{{ preferences.rec_account_email }}{% endif %}">
                     </div>
 
                     <div class="mb-3">
                         <label for="rec_account_password" class="form-label">Rec & Park Account Password</label>
-                        <input type="password" class="form-control" name="rec_account_password" id="rec_account_password" required value="{{ preferences.rec_account_password if preferences else '' }}">
+                        <input type="password" class="form-control" name="rec_account_password" id="rec_account_password" required 
+                               placeholder="Your password" 
+                               >
                     </div>
 
                     <div class="mb-3">
                         <label for="phone_number" class="form-label">Phone Number (for verification)</label>
-                        <input type="tel" class="form-control" name="phone_number" id="phone_number" required pattern="[0-9]{10}" placeholder="1234567890" value="{{ preferences.phone_number if preferences else '' }}">
+                        <input type="tel" class="form-control" name="phone_number" id="phone_number" required pattern="[0-9]{10}" 
+                               placeholder="1234567890" 
+                               value="{% if preferences and preferences.phone_number != '1234567890' %}{{ preferences.phone_number }}{% endif %}">
                         <small class="form-text text-muted">Enter your 10-digit phone number without spaces or special characters</small>
                     </div>
 
@@ -262,120 +238,192 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const courtSelect = document.getElementById('court_name');
-        const refreshButton = document.getElementById('refreshAvailableTimes');
-        const selectAllButton = document.getElementById('selectAllAvailable');
-        const clearAllButton = document.getElementById('clearAllAvailable');
+        // Time picker functionality
+        const timeSelectionsContainer = document.getElementById('time-selections-container');
+        const addTimeBtn = document.getElementById('add-time');
+        const allPreferredTimesInput = document.getElementById('all-preferred-times');
         
-        // Function to load available times for the selected court
-        async function loadAvailableTimes() {
-            const courtName = courtSelect.value;
+        // Playtime duration functionality
+        const playtimeOptions = document.querySelectorAll('.playtime-option');
+        const playtimeDurationInput = document.getElementById('playtime-duration');
+        
+        // Initialize with existing preferences if available
+        const existingPreferredTimes = allPreferredTimesInput.value ? allPreferredTimesInput.value.split(',') : [];
+        
+        if (existingPreferredTimes.length > 0) {
+            // Clear any existing time selections
+            timeSelectionsContainer.innerHTML = '';
             
-            if (!courtName) {
-                document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court to see available times for tomorrow.</p>';
-                document.getElementById('availableTimesError').style.display = 'none';
+            // Limit to maximum 3 time slots
+            const limitedTimes = existingPreferredTimes.slice(0, 3);
+            
+            // Create time selection elements for each time
+            limitedTimes.forEach(time => {
+                // Parse the time in 24-hour format (HH:MM) to components
+                const [hours, minutes] = time.split(':').map(Number);
+                const hour = hours % 12 || 12; // Convert 0 to 12 for display
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                
+                createTimeSelection(hour, minutes, ampm);
+            });
+            
+            // If we limited the times, update the hidden input
+            if (limitedTimes.length < existingPreferredTimes.length) {
+                allPreferredTimesInput.value = limitedTimes.join(',');
+            }
+        } else if (timeSelectionsContainer.children.length === 0) {
+            // If no existing preferences and no time selections, add a default one
+            addTime();
+        }
+        
+        // Add event listener for the add button
+        addTimeBtn.addEventListener('click', function() {
+            // Check if we've reached the maximum number of time slots (3)
+            if (timeSelectionsContainer.children.length >= 3) {
+                alert('You can only add up to 3 time slots.');
                 return;
             }
             
-            // Show loading indicator
-            document.getElementById('availableTimesLoading').style.display = 'block';
-            document.getElementById('availableTimesError').style.display = 'none';
-            document.getElementById('availableTimesList').innerHTML = '';
-            
-            try {
-                const response = await fetch('/get-available-times-for-preferences', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        court_name: courtName
-                    })
-                });
-                
-                const data = await response.json();
-                
-                // Hide loading indicator
-                document.getElementById('availableTimesLoading').style.display = 'none';
-                
-                if (data.status === 'success' && data.times && data.times.length > 0) {
-                    // Get current preferred times
-                    const preferredTimes = Array.from(document.querySelectorAll('input[name="preferred_times"]:checked')).map(input => input.value);
-                    
-                    // Create HTML for available times
-                    let html = `<p class="text-success">Found ${data.times.length} available times for ${courtName} on ${data.date}</p>`;
-                    html += '<div class="row">';
-                    
-                    data.times.forEach(time => {
-                        const [hours, minutes] = time.split(':');
-                        const hour = parseInt(hours);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
-                        
-                        html += `
-                            <div class="col-md-3 mb-2">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input available-time" 
-                                           id="available_${time}" 
-                                           name="preferred_times" 
-                                           value="${time}"
-                                           data-time="${time}"
-                                           ${preferredTimes.includes(time) ? 'checked' : ''}>
-                                    <label class="form-check-label" for="available_${time}">
-                                        ${displayTime}
-                                    </label>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    
-                    html += '</div>';
-                    html += '<button type="button" id="selectAllAvailable" class="btn btn-sm btn-outline-primary mt-2">Select All Available</button> ';
-                    html += '<button type="button" id="clearAllAvailable" class="btn btn-sm btn-outline-secondary mt-2">Clear All</button>';
-                    
-                    document.getElementById('availableTimesList').innerHTML = html;
-                    
-                    // Re-attach event listeners to the new buttons
-                    document.getElementById('selectAllAvailable').addEventListener('click', selectAllAvailableTimes);
-                    document.getElementById('clearAllAvailable').addEventListener('click', clearAllAvailableTimes);
+            addTime();
+            updateAllPreferredTimes();
+        });
+        
+        // Add event delegation for remove buttons
+        timeSelectionsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-time')) {
+                // Don't remove if it's the last one
+                if (timeSelectionsContainer.children.length > 1) {
+                    e.target.closest('.time-item').remove();
+                    updateAllPreferredTimes();
                 } else {
-                    document.getElementById('availableTimesError').style.display = 'block';
-                    document.getElementById('availableTimesList').innerHTML = '';
+                    alert('You must have at least one time selection.');
                 }
-            } catch (error) {
-                console.error('Error loading available times:', error);
-                document.getElementById('availableTimesLoading').style.display = 'none';
-                document.getElementById('availableTimesError').style.display = 'block';
-                document.getElementById('availableTimesList').innerHTML = '';
             }
-        }
+        });
         
-        // Function to select all available times
-        function selectAllAvailableTimes() {
-            document.querySelectorAll('.available-time').forEach(checkbox => {
-                checkbox.checked = true;
+        // Add event delegation for time selects
+        timeSelectionsContainer.addEventListener('change', function(e) {
+            if (e.target.classList.contains('hour-select') || 
+                e.target.classList.contains('minute-select') || 
+                e.target.classList.contains('ampm-select')) {
+                updateAllPreferredTimes();
+            }
+        });
+        
+        // Add event listeners for playtime options
+        playtimeOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove selected class from all options
+                playtimeOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // Add selected class to clicked option
+                this.classList.add('selected');
+                
+                // Update hidden input with selected duration
+                playtimeDurationInput.value = this.getAttribute('data-duration');
             });
+        });
+        
+        // Function to create a time selection with specific time components
+        function createTimeSelection(hour, minute, ampm) {
+            const timeItem = document.createElement('div');
+            timeItem.className = 'time-item mb-3';
+            
+            // Generate hour options (1-12)
+            let hourOptions = '';
+            for (let h = 1; h <= 12; h++) {
+                const selected = h === hour ? 'selected' : '';
+                hourOptions += `<option value="${h}" ${selected}>${h}</option>`;
+            }
+            
+            // Generate minute options (00, 15, 30, 45)
+            let minuteOptions = '';
+            for (let m of [0, 15, 30, 45]) {
+                const selected = m === minute ? 'selected' : '';
+                minuteOptions += `<option value="${m}" ${selected}>${m.toString().padStart(2, '0')}</option>`;
+            }
+            
+            // Generate AM/PM options
+            let ampmOptions = '';
+            for (let ap of ['AM', 'PM']) {
+                const selected = ap === ampm ? 'selected' : '';
+                ampmOptions += `<option value="${ap}" ${selected}>${ap}</option>`;
+            }
+            
+            timeItem.innerHTML = `
+                <div class="row align-items-center">
+                    <div class="col-10">
+                        <div class="time-picker-container">
+                            <div class="d-flex flex-column mx-1" style="width: 80px;">
+                                <label class="time-picker-label">Hour</label>
+                                <select class="time-picker-select hour-select">
+                                    ${hourOptions}
+                                </select>
+                            </div>
+                            <div class="mx-1 pt-4 time-separator">:</div>
+                            <div class="d-flex flex-column mx-1" style="width: 80px;">
+                                <label class="time-picker-label">Minute</label>
+                                <select class="time-picker-select minute-select">
+                                    ${minuteOptions}
+                                </select>
+                            </div>
+                            <div class="d-flex flex-column mx-1" style="width: 80px;">
+                                <label class="time-picker-label">AM/PM</label>
+                                <select class="time-picker-select ampm-select">
+                                    ${ampmOptions}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-2 text-end">
+                        <button type="button" class="btn btn-sm btn-danger remove-time">×</button>
+                    </div>
+                </div>
+            `;
+            
+            timeSelectionsContainer.appendChild(timeItem);
         }
         
-        // Function to clear all available times
-        function clearAllAvailableTimes() {
-            document.querySelectorAll('.available-time').forEach(checkbox => {
-                checkbox.checked = false;
+        // Function to add a new time selection with default values (9:00 AM)
+        function addTime() {
+            createTimeSelection(9, 0, 'AM');
+        }
+        
+        // Function to update the hidden input with all times in the selections
+        function updateAllPreferredTimes() {
+            const allTimes = [];
+            const timeSelections = timeSelectionsContainer.querySelectorAll('.time-item');
+            
+            timeSelections.forEach(selection => {
+                const hourSelect = selection.querySelector('.hour-select');
+                const minuteSelect = selection.querySelector('.minute-select');
+                const ampmSelect = selection.querySelector('.ampm-select');
+                
+                if (hourSelect && minuteSelect && ampmSelect) {
+                    // Get the selected values
+                    let hour = parseInt(hourSelect.value, 10);
+                    const minute = parseInt(minuteSelect.value, 10);
+                    const ampm = ampmSelect.value;
+                    
+                    // Convert to 24-hour format for storage
+                    if (ampm === 'PM' && hour < 12) {
+                        hour += 12;
+                    } else if (ampm === 'AM' && hour === 12) {
+                        hour = 0;
+                    }
+                    
+                    // Format as HH:MM for storage
+                    const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                    allTimes.push(timeValue);
+                }
             });
+            
+            // Update the hidden input
+            allPreferredTimesInput.value = allTimes.join(',');
         }
         
-        // Add event listeners
-        courtSelect.addEventListener('change', loadAvailableTimes);
-        refreshButton.addEventListener('click', loadAvailableTimes);
-        
-        if (selectAllButton) {
-            selectAllButton.addEventListener('click', selectAllAvailableTimes);
-        }
-        
-        if (clearAllButton) {
-            clearAllButton.addEventListener('click', clearAllAvailableTimes);
-        }
+        // Initialize the hidden input with the current time selections
+        updateAllPreferredTimes();
     });
 </script>
 {% endblock %}

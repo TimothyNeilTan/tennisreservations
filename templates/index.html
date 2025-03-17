@@ -24,12 +24,35 @@
                         <input type="date" class="form-control" id="bookingDate" required>
                     </div>
 
+                    <!-- Available Times Section -->
                     <div class="mb-3">
-                        <label for="bookingTime" class="form-label">Preferred Time</label>
-                        <select class="form-select" id="bookingTime" required disabled>
-                            <option value="">Select a court and booking date first</option>
-                        </select>
+                        <label class="form-label">Available Times</label>
+                        <div class="card mb-3 border-info">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <span>Available Times</span>
+                                <button type="button" id="refreshAvailableTimes" class="btn btn-sm btn-light">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="availableTimesLoading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading available times...</p>
+                                </div>
+                                <div id="availableTimesError" class="alert alert-warning" style="display: none;">
+                                    No available times found. Please select a court and date.
+                                </div>
+                                <div id="availableTimesList">
+                                    <p class="text-muted">Select a court and date to see available times.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Hidden input to store the selected time -->
+                    <input type="hidden" id="selectedTime" name="selectedTime" value="">
 
                     <button type="submit" class="btn btn-primary">Schedule Booking</button>
                 </form>
@@ -41,11 +64,171 @@
 
 {% block scripts %}
 <script>
-    // Set minimum date to tomorrow
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const minDate = tomorrow.toISOString().split('T')[0];
-    document.getElementById('bookingDate').min = minDate;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set minimum date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const minDate = tomorrow.toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = minDate;
+        
+        const courtNameSelect = document.getElementById('courtName');
+        const bookingDateInput = document.getElementById('bookingDate');
+        const refreshButton = document.getElementById('refreshAvailableTimes');
+        const selectedTimeInput = document.getElementById('selectedTime');
+        
+        // Function to load available times
+        async function loadAvailableTimes() {
+            const courtName = courtNameSelect.value;
+            const bookingDate = bookingDateInput.value;
+            
+            if (!courtName || !bookingDate) {
+                document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
+                document.getElementById('availableTimesError').style.display = 'none';
+                selectedTimeInput.value = '';
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('availableTimesLoading').style.display = 'block';
+            document.getElementById('availableTimesError').style.display = 'none';
+            document.getElementById('availableTimesList').innerHTML = '';
+            
+            // Clear selected time
+            selectedTimeInput.value = '';
+            
+            try {
+                const response = await fetch('/get-available-times', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        date: bookingDate
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                
+                if (data.status === 'success' && data.times && data.times.length > 0) {
+                    // Create HTML for available times
+                    let html = `<p class="text-success">Found ${data.times.length} available times for ${courtName} on ${bookingDate}</p>`;
+                    html += '<div class="row">';
+                    
+                    data.times.forEach(time => {
+                        const [hours, minutes] = time.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                        
+                        html += `
+                            <div class="col-md-3 mb-2">
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input available-time" 
+                                           id="available_${time}" 
+                                           name="available_time" 
+                                           value="${time}"
+                                           data-time="${time}">
+                                    <label class="form-check-label" for="available_${time}">
+                                        ${displayTime}
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    
+                    document.getElementById('availableTimesList').innerHTML = html;
+                    
+                    // Add event listeners to radio buttons
+                    document.querySelectorAll('.available-time').forEach(radio => {
+                        radio.addEventListener('change', function() {
+                            if (this.checked) {
+                                // Update the hidden input
+                                selectedTimeInput.value = this.value;
+                            }
+                        });
+                    });
+                    
+                    // Add note if times were scraped
+                    if (data.is_scraped) {
+                        const noteDiv = document.createElement('div');
+                        noteDiv.id = 'timeNote';
+                        noteDiv.className = 'text-info small mt-1';
+                        noteDiv.textContent = 'These are actual available times from the booking system.';
+                        document.getElementById('availableTimesList').appendChild(noteDiv);
+                    }
+                } else {
+                    document.getElementById('availableTimesError').style.display = 'block';
+                    document.getElementById('availableTimesList').innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error loading available times:', error);
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                document.getElementById('availableTimesError').style.display = 'block';
+                document.getElementById('availableTimesList').innerHTML = '';
+            }
+        }
+        
+        // Add event listeners
+        courtNameSelect.addEventListener('change', loadAvailableTimes);
+        bookingDateInput.addEventListener('change', loadAvailableTimes);
+        refreshButton.addEventListener('click', loadAvailableTimes);
+        
+        // Handle form submission
+        document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const courtName = courtNameSelect.value;
+            const bookingDate = bookingDateInput.value;
+            const selectedTime = selectedTimeInput.value;
+            
+            if (!courtName || !bookingDate) {
+                alert('Please select a court and date');
+                return;
+            }
+            
+            if (!selectedTime) {
+                alert('Please select an available time');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/schedule-booking', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        booking_time: new Date(`${bookingDate}T${selectedTime}`).toISOString()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert(`Booking submitted successfully!`);
+                    // Reset form
+                    this.reset();
+                    // Reset available times
+                    document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
+                    document.getElementById('availableTimesError').style.display = 'none';
+                    // Clear selected time
+                    selectedTimeInput.value = '';
+                } else {
+                    alert(`Booking failed: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error submitting booking:', error);
+                alert('Error submitting booking. Please try again.');
+            }
+        });
+    });
 </script>
-<script src="{{ url_for('static', filename='js/scheduler.js') }}"></script>
 {% endblock %}

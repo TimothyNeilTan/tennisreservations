@@ -50,7 +50,8 @@ def test_booking_preference():
             preferred_times=["09:00", "10:00"],
             rec_account_email="test@example.com",
             rec_account_password="testpass123",
-            phone_number="1234567890"
+            phone_number="1234567890",
+            playtime_duration=60
         )
         result = pref.save()
         logger.info(f"✓ Successfully created booking preference")
@@ -58,6 +59,7 @@ def test_booking_preference():
         # Get latest preference
         latest = BookingPreference.get_latest()
         logger.info(f"✓ Retrieved latest preference for court: {latest['court_name']}")
+        logger.info(f"✓ Playtime duration: {latest['playtime_duration']} minutes")
         
         return True
     except Exception as e:

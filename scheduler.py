@@ -28,9 +28,20 @@ def booking_job(attempt_id):
             sf_timezone = ZoneInfo("America/Los_Angeles")
             booking_time = datetime.fromisoformat(attempt['booking_time'])
             local_booking_time = booking_time.astimezone(sf_timezone)
+            
+            # Get playtime duration (default to 60 minutes if not set or invalid)
+            playtime_duration = pref.get('playtime_duration', 60)
+            if playtime_duration not in [60, 90]:
+                logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
+                playtime_duration = 60
+            logger.info(f"Using playtime duration: {playtime_duration} minutes")
 
             # Attempt booking
-            success, error = booker.book_court(attempt['court_name'], local_booking_time)
+            success, error = booker.book_court(
+                attempt['court_name'], 
+                local_booking_time, 
+                playtime_duration=playtime_duration
+            )
 
             # Update attempt status
             status = 'completed' if success else 'failed'

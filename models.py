@@ -58,13 +58,14 @@ class Court:
 class BookingPreference:
     def __init__(self, court_name: str, preferred_days: List[str], 
                  preferred_times: List[str], rec_account_email: str, 
-                 rec_account_password: str, phone_number: str):
+                 rec_account_password: str, phone_number: str, playtime_duration: int = 60):
         self.court_name = court_name
         self.preferred_days = json.dumps(preferred_days)
         self.preferred_times = json.dumps(preferred_times)
         self.rec_account_email = rec_account_email
         self.rec_account_password = rec_account_password
         self.phone_number = phone_number
+        self.playtime_duration = playtime_duration
 
     @staticmethod
     def get_latest() -> Optional[Dict[str, Any]]:
@@ -82,6 +83,11 @@ class BookingPreference:
             # If JSON parsing fails, return empty lists
             pref['preferred_days'] = []
             pref['preferred_times'] = []
+        
+        # Set default playtime duration if not present or invalid
+        if 'playtime_duration' not in pref or pref['playtime_duration'] is None or pref['playtime_duration'] not in [60, 90]:
+            pref['playtime_duration'] = 60
+            
         return pref
 
     def save(self) -> Dict[str, Any]:
@@ -93,6 +99,7 @@ class BookingPreference:
             "rec_account_email": self.rec_account_email,
             "rec_account_password": self.rec_account_password,
             "phone_number": self.phone_number,
+            "playtime_duration": self.playtime_duration,
             "created_at": datetime.now().isoformat()
         }
         response = supabase.table("booking_preferences").insert(data).execute()

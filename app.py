@@ -9,6 +9,7 @@ from automation import TennisBooker
 from models import Court, BookingPreference, BookingAttempt
 from database import init_db
 from extensions import scheduler
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -65,8 +66,22 @@ def sync_courts():
 
 @app.route('/')
 def index():
+    # Get all active courts
     courts = Court.get_all_active()
-    return render_template('index.html', courts=courts)
+    
+    # Get tomorrow's date for display
+    sf_timezone = ZoneInfo("America/Los_Angeles")
+    now = datetime.now(sf_timezone)
+    tomorrow = now + timedelta(days=1)
+    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+    
+    # Get the most recent preferences
+    preferences = BookingPreference.get_latest()
+    
+    return render_template('index.html', 
+                          courts=courts, 
+                          tomorrow_date=tomorrow_str,
+                          preferences=preferences)
 
 @app.route('/courts/refresh', methods=['POST'])
 def refresh_courts():
@@ -98,10 +113,43 @@ def debug_courts():
 def preferences():
     if request.method == 'POST':
         try:
+            # Get preferred times from the hidden input (comma-separated string)
+            preferred_times_str = request.form.get('preferred_times', '')
+            preferred_times = preferred_times_str.split(',') if preferred_times_str else []
+            
+            # Filter out any empty strings
+            preferred_times = [time for time in preferred_times if time.strip()]
+            
+            # Ensure all times are in the correct format (HH:MM)
+            for i, time in enumerate(preferred_times):
+                if not time.strip():
+                    continue
+                    
+                # If time doesn't match HH:MM format, log an error
+                if not re.match(r'^\d{2}:\d{2}$', time):
+                    logger.warning(f"Invalid time format: {time}, skipping")
+                    preferred_times[i] = None
+            
+            # Remove any None values
+            preferred_times = [time for time in preferred_times if time is not None]
+            
+            # Get playtime duration (default to 60 minutes)
+            playtime_duration = request.form.get('playtime_duration', '60')
+            try:
+                playtime_duration = int(playtime_duration)
+                # Validate that playtime duration is one of the allowed values
+                if playtime_duration not in [60, 90]:
+                    logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
+                    playtime_duration = 60
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid playtime duration format: {playtime_duration}, defaulting to 60")
+                playtime_duration = 60
+            
             pref = BookingPreference(
                 court_name=request.form['court_name'],
                 preferred_days=request.form.getlist('preferred_days'),
-                preferred_times=request.form.getlist('preferred_times'),
+                preferred_times=preferred_times,
+                playtime_duration=playtime_duration,
                 rec_account_email=request.form['rec_account_email'],
                 rec_account_password=request.form['rec_account_password'],
                 phone_number=request.form['phone_number']
@@ -117,33 +165,9 @@ def preferences():
     current_preferences = BookingPreference.get_latest()
     courts = Court.get_all_active()
     
-    # Get tomorrow's date for available times
-    sf_timezone = ZoneInfo("America/Los_Angeles")
-    now = datetime.now(sf_timezone)
-    tomorrow = now + timedelta(days=1)
-    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
-    
-    # Get available times for the preferred court if one is set
-    available_times = []
-    if current_preferences and current_preferences.get('court_name'):
-        try:
-            # Initialize TennisBooker with credentials
-            booker = TennisBooker(
-                current_preferences.get('rec_account_email', ''),
-                current_preferences.get('rec_account_password', '')
-            )
-            
-            # Get available times for tomorrow
-            available_times = booker.get_available_times(current_preferences.get('court_name'), tomorrow_str)
-            logger.info(f"Found {len(available_times)} available times for {current_preferences.get('court_name')} on {tomorrow_str}")
-        except Exception as e:
-            logger.error(f"Error getting available times: {str(e)}")
-    
     return render_template('preferences.html', 
                          courts=courts, 
-                         preferences=current_preferences,
-                         available_times=available_times,
-                         tomorrow_date=tomorrow_str)
+                         preferences=current_preferences)
 
 @app.route('/schedule-booking', methods=['POST'])
 def schedule_booking():

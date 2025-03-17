@@ -13,6 +13,8 @@ import requests
 import logging
 from typing import List
 import time
+import pytz
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +58,12 @@ class TennisBooker:
             court_names = [elem.get_text(strip=True) for elem in court_elements]
             return court_names
 
-
-
-    def book_court(self, court_name: str, booking_time) -> tuple[bool, str]:
+    def book_court(self, court_name: str, booking_time, playtime_duration: int = 60) -> tuple[bool, str]:
+        # Validate playtime duration
+        if playtime_duration not in [60, 90]:
+            logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
+            playtime_duration = 60
+            
         try:
             with sync_playwright() as playwright:
                 # Launch browser
@@ -101,6 +106,19 @@ class TennisBooker:
                 time_selector = f'//button[contains(text(), "{booking_hour}")]'
                 page.wait_for_selector(time_selector)
                 page.click(time_selector)
+                
+                # Select the duration if available
+                try:
+                    # Look for duration options
+                    duration_selector = f'//button[contains(text(), "{playtime_duration} min")]'
+                    duration_element = page.wait_for_selector(duration_selector, timeout=5000)
+                    if duration_element:
+                        duration_element.click()
+                        logger.info(f"Selected {playtime_duration} minutes duration")
+                    else:
+                        logger.warning(f"Duration option for {playtime_duration} minutes not found, using default")
+                except Exception as duration_error:
+                    logger.warning(f"Could not select duration: {str(duration_error)}")
 
                 # Click reserve button
                 page.click('button:has-text("Reserve")')
@@ -133,7 +151,7 @@ class TennisBooker:
         logger.info(f"Getting available times for {court_name} on {date_str}")
         
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=False)
+            browser = playwright.chromium.launch()
             context = browser.new_context(java_script_enabled = True)
             # stealth_sync(context)
             page = context.new_page()
@@ -196,15 +214,38 @@ class TennisBooker:
                             for slide in swiper_wrapper.find_all('div', class_=lambda c: c and 'swiper-slide' in c):
                                 time_tag = slide.find('p', class_="text-[0.875rem] font-medium")
                                 if time_tag:
-                                    times_list.append(time_tag.get_text(strip=True))
+                                    time_text = time_tag.get_text(strip=True)
+                                    # Convert from "7:30 AM" format to "07:30" format (24-hour)
+                                    if ":" in time_text:
+                                        try:
+                                            if "AM" in time_text:
+                                                hour = time_text.split(':')[0]
+                                                minute = time_text.split(':')[1].split(' ')[0]
+                                                if len(hour) == 1:
+                                                    hour = f"0{hour}"
+                                                times_list.append(f"{hour}:{minute}")
+                                            elif "PM" in time_text:
+                                                hour = int(time_text.split(':')[0])
+                                                if hour < 12:
+                                                    hour += 12
+                                                minute = time_text.split(':')[1].split(' ')[0]
+                                                times_list.append(f"{hour}:{minute}")
+                                            else:
+                                                # If no AM/PM indicator, just add the raw time
+                                                times_list.append(time_text)
+                                        except Exception as e:
+                                            print(f"Error parsing time '{time_text}': {str(e)}")
+                                            # Add the raw time as fallback
+                                            times_list.append(time_text)
                             print("Extracted times:", times_list)
+                            return times_list
                         else:
                             print("Swiper wrapper not found in this container.")
 
 if __name__ == "__main__":
     # Configure logging to show debug messages
-    # logging.basicConfig(level=logging.DEBUG, 
-    #                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.DEBUG, 
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
     # Test credentials - replace with your actual credentials
     email = "neil81688@gmail.com"
@@ -214,34 +255,36 @@ if __name__ == "__main__":
     print("Initializing TennisBooker...")
     tennis_booker = TennisBooker(email, password)
 
-
-    print(tennis_booker.get_available_courts())
+    # Get available courts
+    print("\nGetting available courts...")
+    courts = tennis_booker.get_available_courts()
+    print(f"Found {len(courts)} courts: {courts}")
     
     # Test court and date
-    # test_court = "Balboa"
+    test_court = "Alice Marble Tennis Courts"
     
-    # # Get tomorrow's date
-    # from datetime import datetime, timedelta
-    # from zoneinfo import ZoneInfo
-    # sf_timezone = ZoneInfo("America/Los_Angeles")
-    # now = datetime.now(sf_timezone)
-    # tomorrow = now + timedelta(days=1)
-    # tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+    # Get tomorrow's date
+    sf_timezone = pytz.timezone("America/Los_Angeles")
+    now = datetime.now(sf_timezone)
+    tomorrow = now + timedelta(days=1)
+    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
     
-    # try:
-    #     # Get available times
-    #     times = tennis_booker.get_available_times(test_court, tomorrow_str)
+    print(f"\nTesting get_available_times() for {test_court} on {tomorrow_str}...")
+    
+    try:
+        # Get available times
+        times = tennis_booker.get_available_times(test_court, tomorrow_str)
         
-    #     if times:
-    #         print(f"SUCCESS! Found {len(times)} available times:")
-    #         for time in times:
-    #             print(f"  - {time}")
-    #     else:
-    #         print("No available times found. This could be because:")
-    #         print("  - The court is fully booked for tomorrow")
-    #         print("  - There was an issue with the scraping process")
-    #         print("  - The website structure may have changed")
-    # except Exception as e:
-    #     print(f"ERROR: Failed to get available times: {str(e)}")
-    #     import traceback
-    #     traceback.print_exc()
+        if times:
+            print(f"SUCCESS! Found {len(times)} available times:")
+            for time in times:
+                print(f"  - {time}")
+        else:
+            print("No available times found. This could be because:")
+            print("  - The court is fully booked for tomorrow")
+            print("  - There was an issue with the scraping process")
+            print("  - The website structure may have changed")
+    except Exception as e:
+        print(f"ERROR: Failed to get available times: {str(e)}")
+        import traceback
+        traceback.print_exc()
