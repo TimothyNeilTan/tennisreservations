@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h4>Schedule Tennis Court Booking</h4>
+            </div>
+            <div class="card-body">
+                <form id="bookingForm">
+                    <div class="mb-3">
+                        <label for="courtName" class="form-label">Court Name</label>
+                        <select class="form-select" id="courtName" required>
+                            <option value="">Select a court</option>
+                            {% for court in courts %}
+                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bookingDate" class="form-label">Booking Date</label>
+                        <input type="date" class="form-control" id="bookingDate" required>
+                    </div>
+
+                    <!-- User Info Section -->
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header bg-primary text-white">
+                            User Information
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" placeholder="user@example.com" required
+                                    value="{% if preferences and preferences.rec_account_email %}{{ preferences.rec_account_email }}{% endif %}">
+                                <div class="form-text">Your SF Rec & Park account email.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" required>
+                                <div class="form-text">Your SF Rec & Park account password.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" placeholder="(123) 456-7890" required
+                                    value="{% if preferences and preferences.phone_number %}{{ preferences.phone_number }}{% endif %}">
+                                <div class="form-text">Your phone number for booking notifications.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="playtimeDuration" class="form-label">Playtime Duration</label>
+                                <select class="form-select" id="playtimeDuration" required>
+                                    <option value="60" {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
+                                    <option value="90" {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
+                                </select>
+                                <div class="form-text">How long you want to play.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available Times Section -->
+                    <div class="mb-3">
+                        <label class="form-label">Available Times</label>
+                        <div class="card mb-3 border-info">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <span>Available Times</span>
+                                <button type="button" id="refreshAvailableTimes" class="btn btn-sm btn-light">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="availableTimesLoading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading available times...</p>
+                                </div>
+                                <div id="availableTimesError" class="alert alert-warning" style="display: none;">
+                                    No available times found. Please select a court and date.
+                                </div>
+                                <div id="availableTimesList">
+                                    <p class="text-muted">Select a court and date to see available times.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden input to store the selected time -->
+                    <input type="hidden" id="selectedTime" name="selectedTime" value="">
+
+                    <button type="submit" class="btn btn-primary">Schedule Booking</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set minimum date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const minDate = tomorrow.toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = minDate;
+        
+        const courtNameSelect = document.getElementById('courtName');
+        const bookingDateInput = document.getElementById('bookingDate');
+        const refreshButton = document.getElementById('refreshAvailableTimes');
+        const selectedTimeInput = document.getElementById('selectedTime');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const phoneInput = document.getElementById('phone');
+        const playtimeDurationSelect = document.getElementById('playtimeDuration');
+        
+        // Function to load available times
+        async function loadAvailableTimes() {
+            const courtName = courtNameSelect.value;
+            const bookingDate = bookingDateInput.value;
+            
+            if (!courtName || !bookingDate) {
+                document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
+                document.getElementById('availableTimesError').style.display = 'none';
+                selectedTimeInput.value = '';
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('availableTimesLoading').style.display = 'block';
+            document.getElementById('availableTimesError').style.display = 'none';
+            document.getElementById('availableTimesList').innerHTML = '';
+            
+            // Clear selected time
+            selectedTimeInput.value = '';
+            
+            try {
+                const response = await fetch('/get-available-times', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        date: bookingDate
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                
+                if (data.status === 'success' && data.times && data.times.length > 0) {
+                    // Create HTML for available times
+                    let html = `<p class="text-success">Found ${data.times.length} available times for ${courtName} on ${bookingDate}</p>`;
+                    html += '<div class="row">';
+                    
+                    data.times.forEach(time => {
+                        const [hours, minutes] = time.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                        
+                        html += `
+                            <div class="col-md-3 mb-2">
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input available-time" 
+                                           id="available_${time}" 
+                                           name="available_time" 
+                                           value="${time}"
+                                           data-time="${time}">
+                                    <label class="form-check-label" for="available_${time}">
+                                        ${displayTime}
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    
+                    document.getElementById('availableTimesList').innerHTML = html;
+                    
+                    // Add event listeners to radio buttons
+                    document.querySelectorAll('.available-time').forEach(radio => {
+                        radio.addEventListener('change', function() {
+                            if (this.checked) {
+                                // Update the hidden input
+                                selectedTimeInput.value = this.value;
+                            }
+                        });
+                    });
+                    
+                    // Add note if times were scraped
+                    if (data.is_scraped) {
+                        const noteDiv = document.createElement('div');
+                        noteDiv.id = 'timeNote';
+                        noteDiv.className = 'text-info small mt-1';
+                        noteDiv.textContent = 'These are actual available times from the booking system.';
+                        document.getElementById('availableTimesList').appendChild(noteDiv);
+                    }
+                } else {
+                    document.getElementById('availableTimesError').style.display = 'block';
+                    document.getElementById('availableTimesList').innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error loading available times:', error);
+                document.getElementById('availableTimesLoading').style.display = 'none';
+                document.getElementById('availableTimesError').style.display = 'block';
+                document.getElementById('availableTimesList').innerHTML = '';
+            }
+        }
+        
+        // Add event listeners
+        courtNameSelect.addEventListener('change', loadAvailableTimes);
+        bookingDateInput.addEventListener('change', loadAvailableTimes);
+        refreshButton.addEventListener('click', loadAvailableTimes);
+        
+        // Handle form submission
+        document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const courtName = courtNameSelect.value;
+            const bookingDate = bookingDateInput.value;
+            const selectedTime = selectedTimeInput.value;
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            const phone = phoneInput.value;
+            const playtimeDuration = parseInt(document.getElementById('playtimeDuration').value);
+            
+            if (!courtName || !bookingDate) {
+                alert('Please select a court and date');
+                return;
+            }
+            
+            if (!selectedTime) {
+                alert('Please select an available time');
+                return;
+            }
+            
+            if (!email || !password || !phone) {
+                alert('Please provide your email, password, and phone number');
+                return;
+            }
+            
+            try {
+                // First, save user preferences
+                const preferencesResponse = await fetch('/save-booking-info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        rec_account_email: email,
+                        rec_account_password: password,
+                        phone_number: phone,
+                        playtime_duration: playtimeDuration
+                    })
+                });
+                
+                const preferencesData = await preferencesResponse.json();
+                
+                if (preferencesData.status !== 'success') {
+                    alert(`Failed to save user information: ${preferencesData.message}`);
+                    return;
+                }
+                
+                // Then schedule the booking
+                const response = await fetch('/schedule-booking', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        booking_time: new Date(`${bookingDate}T${selectedTime}`).toISOString()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    alert(`Booking submitted successfully!`);
+                    // Reset form fields except user info
+                    courtNameSelect.value = '';
+                    bookingDateInput.value = '';
+                    // Reset available times
+                    document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
+                    document.getElementById('availableTimesError').style.display = 'none';
+                    // Clear selected time
+                    selectedTimeInput.value = '';
+                } else {
+                    alert(`Booking failed: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error submitting booking:', error);
+                alert('Error submitting booking. Please try again.');
+            }
+        });
+    });
+</script>
+{% endblock %}
