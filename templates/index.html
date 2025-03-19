@@ -24,6 +24,43 @@
                         <input type="date" class="form-control" id="bookingDate" required>
                     </div>
 
+                    <!-- User Info Section -->
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header bg-primary text-white">
+                            User Information
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" placeholder="user@example.com" required
+                                    value="{% if preferences and preferences.rec_account_email %}{{ preferences.rec_account_email }}{% endif %}">
+                                <div class="form-text">Your SF Rec & Park account email.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" required>
+                                <div class="form-text">Your SF Rec & Park account password.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" placeholder="(123) 456-7890" required
+                                    value="{% if preferences and preferences.phone_number %}{{ preferences.phone_number }}{% endif %}">
+                                <div class="form-text">Your phone number for booking notifications.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="playtimeDuration" class="form-label">Playtime Duration</label>
+                                <select class="form-select" id="playtimeDuration" required>
+                                    <option value="60" {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
+                                    <option value="90" {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
+                                </select>
+                                <div class="form-text">How long you want to play.</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Available Times Section -->
                     <div class="mb-3">
                         <label class="form-label">Available Times</label>
@@ -75,6 +112,10 @@
         const bookingDateInput = document.getElementById('bookingDate');
         const refreshButton = document.getElementById('refreshAvailableTimes');
         const selectedTimeInput = document.getElementById('selectedTime');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const phoneInput = document.getElementById('phone');
+        const playtimeDurationSelect = document.getElementById('playtimeDuration');
         
         // Function to load available times
         async function loadAvailableTimes() {
@@ -187,6 +228,10 @@
             const courtName = courtNameSelect.value;
             const bookingDate = bookingDateInput.value;
             const selectedTime = selectedTimeInput.value;
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            const phone = phoneInput.value;
+            const playtimeDuration = parseInt(document.getElementById('playtimeDuration').value);
             
             if (!courtName || !bookingDate) {
                 alert('Please select a court and date');
@@ -198,7 +243,35 @@
                 return;
             }
             
+            if (!email || !password || !phone) {
+                alert('Please provide your email, password, and phone number');
+                return;
+            }
+            
             try {
+                // First, save user preferences
+                const preferencesResponse = await fetch('/save-booking-info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        court_name: courtName,
+                        rec_account_email: email,
+                        rec_account_password: password,
+                        phone_number: phone,
+                        playtime_duration: playtimeDuration
+                    })
+                });
+                
+                const preferencesData = await preferencesResponse.json();
+                
+                if (preferencesData.status !== 'success') {
+                    alert(`Failed to save user information: ${preferencesData.message}`);
+                    return;
+                }
+                
+                // Then schedule the booking
                 const response = await fetch('/schedule-booking', {
                     method: 'POST',
                     headers: {
@@ -214,8 +287,9 @@
                 
                 if (data.status === 'success') {
                     alert(`Booking submitted successfully!`);
-                    // Reset form
-                    this.reset();
+                    // Reset form fields except user info
+                    courtNameSelect.value = '';
+                    bookingDateInput.value = '';
                     // Reset available times
                     document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
                     document.getElementById('availableTimesError').style.display = 'none';

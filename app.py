@@ -361,6 +361,74 @@ def get_available_times_for_preferences():
             'message': str(e)
         }), 500
 
+@app.route('/save-booking-info', methods=['POST'])
+def save_booking_info():
+    """Save the user's booking information to the preferences table"""
+    try:
+        data = request.get_json()
+        court_name = data.get('court_name')
+        rec_account_email = data.get('rec_account_email')
+        rec_account_password = data.get('rec_account_password')
+        phone_number = data.get('phone_number')
+        playtime_duration = data.get('playtime_duration', 60)
+        
+        # Validate required fields
+        if not all([court_name, rec_account_email, rec_account_password, phone_number]):
+            return jsonify({
+                'status': 'error',
+                'message': 'All fields are required'
+            }), 400
+        
+        # Validate playtime duration
+        try:
+            playtime_duration = int(playtime_duration)
+            if playtime_duration not in [60, 90]:
+                logger.warning(f"Invalid playtime duration {playtime_duration}. Defaulting to 60 minutes.")
+                playtime_duration = 60
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid playtime duration format. Defaulting to 60 minutes.")
+            playtime_duration = 60
+        
+        # Get the latest preferences to maintain the preferred days and times
+        current_preferences = BookingPreference.get_latest()
+        
+        # Use existing values or empty lists if no preferences exist
+        preferred_days = current_preferences.get('preferred_days', []) if current_preferences else []
+        preferred_times = current_preferences.get('preferred_times', []) if current_preferences else []
+        
+        # Create a new booking preference
+        pref = BookingPreference(
+            court_name=court_name,
+            preferred_days=preferred_days,
+            preferred_times=preferred_times,
+            playtime_duration=playtime_duration,
+            rec_account_email=rec_account_email,
+            rec_account_password=rec_account_password,
+            phone_number=phone_number
+        )
+        
+        # Save to database
+        result = pref.save()
+        
+        if not result:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to save booking information'
+            }), 500
+        
+        logger.info(f"Successfully saved booking information for {rec_account_email}")
+        return jsonify({
+            'status': 'success',
+            'message': 'Booking information saved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error saving booking information: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == "__main__":
     # Initialize database
     init_db()

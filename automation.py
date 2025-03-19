@@ -149,6 +149,10 @@ class TennisBooker:
         """
 
         logger.info(f"Getting available times for {court_name} on {date_str}")
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+        target_day = target_date.strftime("%d")
+        target_month = target_date.strftime("%B")  # Full month name
+        target_year = target_date.strftime("%Y")
         
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
@@ -172,24 +176,65 @@ class TennisBooker:
                 print(f"Error clicking button: {str(e)}")
                 page.screenshot(path="button_error.png")
             
-            # Wait for any content changes after clicking
-
-            # Wait for the page to load
-            # page.wait_for_timeout(2000)
-            
             # Find and click on day 15 in the calendar
-            day_selector = 'button[name="day"]:has-text("17")'
+            page.wait_for_selector('.rdp', state="visible")
+    
+    # Navigate to the correct month
+            while True:
+                # Get current month and year from the calendar
+                current_month_element = page.locator('div[role="presentation"][id^="react-day-picker-"]')
+                current_month_text = current_month_element.text_content()
+                current_month, current_year = current_month_text.strip().split()
+                
+                print(f"Current month: {current_month} {current_year}")
+                print(f"Target month: {target_month} {target_year}")
+                
+                # If we're at the correct month and year, break
+                if current_month == target_month and current_year == target_year:
+                    break
+                    
+                # Click next month button
+                next_month_button = page.locator('button[name="next-month"]')
+                next_month_button.click()
+                # Wait for calendar to update
+                page.wait_for_timeout(500)
+            
+            # Find and click on the target day
             try:
-                day_button = page.wait_for_selector(day_selector, state="visible", timeout=5000)
-                if day_button:
-                    day_button.click()
-                    page.wait_for_timeout(5000)
-                    print("Successfully clicked on day 17")
-                else:
-                    print("Day 17 button not found")
+        # First try: Use the most specific selector for the active day in current month
+                specific_selector = f'button[name="day"]:has-text("{target_day}"):not(.day-outside):not(.opacity-50)'
+                page.locator(specific_selector).first.click()
             except Exception as e:
-                print(f"Error clicking day 17: {str(e)}")
-                page.screenshot(path="day_selection_error.png")
+                print(f"Error with specific selector: {str(e)}")
+                try:
+                    # Second try: Get all day buttons with the target day text and filter out the one from previous/next month
+                    all_day_buttons = page.locator(f'button[name="day"]:has-text("{target_day}")').all()
+                    
+                    # Debug info
+                    print(f"Found {len(all_day_buttons)} buttons for day {target_day}")
+                    
+                    # Find the first button that doesn't have the day-outside class
+                    current_month_button = None
+                    for button in all_day_buttons:
+                        # Check if this is NOT a day from outside the current month
+                        class_attr = button.get_attribute("class")
+                        if class_attr and "day-outside" not in class_attr and "opacity-50" not in class_attr:
+                            current_month_button = button
+                            break
+                    
+                    if current_month_button:
+                        current_month_button.click()
+                        print(f"Successfully clicked on day {target_day} from current month")
+                    else:
+                        # Last resort: just click the nth button
+                        page.locator(f'button[name="day"]:has-text("{target_day}")').nth(1).click()
+                        print(f"Clicked on day {target_day} using nth selector")
+                except Exception as e2:
+                    print(f"All attempts to click day {target_day} failed: {str(e2)}")
+                    page.screenshot(path="day_selection_error.png")
+            
+            # Wait after clicking the day
+            page.wait_for_timeout(5000)
 
 
             html = page.content()
@@ -200,7 +245,7 @@ class TennisBooker:
                 
                 if court_name_tag and sport_tag:
                     if court_name_tag.get_text(strip=True) == court_name and sport_tag.get_text(strip=True) == "Tennis":
-                        print("Found container for Alice Marble playing Tennis")
+                        print(f"Found container for {court_name} playing Tennis")
                         swiper_wrapper = None
                         for rel_div in container.select("div.relative"):
                             potential_swiper = rel_div.find("div", class_="swiper-wrapper")
