@@ -434,4 +434,4 @@ if __name__ == "__main__":
     init_db()
     # Sync courts on startup
     sync_courts()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)
