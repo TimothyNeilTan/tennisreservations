@@ -288,31 +288,7 @@
             document.getElementById('bookingLoadingOverlay').style.display = 'flex';
             
             try {
-                // First, save user preferences
-                const preferencesResponse = await fetch('/save-booking-info', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        court_name: courtName,
-                        rec_account_email: email,
-                        rec_account_password: password,
-                        phone_number: phone,
-                        playtime_duration: playtimeDuration
-                    })
-                });
-                
-                const preferencesData = await preferencesResponse.json();
-                
-                if (preferencesData.status !== 'success') {
-                    // Hide loading overlay if there's an error
-                    document.getElementById('bookingLoadingOverlay').style.display = 'none';
-                    alert(`Failed to save user information: ${preferencesData.message}`);
-                    return;
-                }
-                
-                // Then schedule the booking
+                // Schedule the booking directly
                 const response = await fetch('/schedule-booking', {
                     method: 'POST',
                     headers: {
@@ -330,8 +306,9 @@
                 document.getElementById('bookingLoadingOverlay').style.display = 'none';
                 
                 if (data.status === 'success') {
-                    alert(`Booking submitted successfully!`);
-                    // Reset form fields except user info
+                    // Use the specific message from the backend for all success scenarios
+                    alert(`Booking status: ${data.message}`); 
+                    // Reset form fields except user info (which is now just display)
                     courtNameSelect.value = '';
                     bookingDateInput.value = '';
                     // Reset available times
@@ -340,6 +317,7 @@
                     // Clear selected time
                     selectedTimeInput.value = '';
                 } else {
+                    // Use the specific error message from the backend
                     alert(`Booking failed: ${data.message}`);
                 }
             } catch (error) {

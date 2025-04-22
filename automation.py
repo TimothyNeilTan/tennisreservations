@@ -331,144 +331,186 @@ class TennisBooker:
             List of available time slots in HH:MM format (24-hour)
         """
 
-        logger.info(f"Getting available times for {court_name} on {date_str}")
+        logger.info(f"[TennisBooker.get_available_times] START for '{court_name}' on {date_str}")
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
         target_day = target_date.strftime("%d")
         target_month = target_date.strftime("%B")  # Full month name
         target_year = target_date.strftime("%Y")
-        
+        logger.debug(f"[TennisBooker.get_available_times] Target date parsed: Day={target_day}, Month={target_month}, Year={target_year}")
+
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch()
-            context = browser.new_context(java_script_enabled = True)
-            # stealth_sync(context)
-            page = context.new_page()
-
-            page.goto("https://www.rec.us/organizations/san-francisco-rec-park", wait_until="networkidle")
-            page.wait_for_selector("a.no-underline.hover\\:underline", state="attached")
-
-            # Find and click the button with the specified classes
-            button_selector = 'button.rounded-2xl.border.border-gray-200.px-4.py-1.hover\\:border-black.bg-gray-200'
+            browser = None # Initialize browser variable
             try:
-                button = page.wait_for_selector(button_selector, state="visible", timeout=5000)
-                if button:
-                    button.click()
-                    print("Successfully clicked the button")
-                else:
-                    print("Button not found")
-            except Exception as e:
-                print(f"Error clicking button: {str(e)}")
-                page.screenshot(path="button_error.png")
-            
-            # Find and click on day 15 in the calendar
-            page.wait_for_selector('.rdp', state="visible")
-    
-    # Navigate to the correct month
-            while True:
-                # Get current month and year from the calendar
-                current_month_element = page.locator('div[role="presentation"][id^="react-day-picker-"]')
-                current_month_text = current_month_element.text_content()
-                current_month, current_year = current_month_text.strip().split()
-                
-                print(f"Current month: {current_month} {current_year}")
-                print(f"Target month: {target_month} {target_year}")
-                
-                # If we're at the correct month and year, break
-                if current_month == target_month and current_year == target_year:
-                    break
-                    
-                # Click next month button
-                next_month_button = page.locator('button[name="next-month"]')
-                next_month_button.click()
-                # Wait for calendar to update
-                page.wait_for_timeout(500)
-            
-            # Find and click on the target day
-            try:
-        # First try: Use the most specific selector for the active day in current month
-                specific_selector = f'button[name="day"]:has-text("{target_day}"):not(.day-outside):not(.opacity-50)'
-                page.locator(specific_selector).first.click()
-            except Exception as e:
-                print(f"Error with specific selector: {str(e)}")
+                logger.debug("[TennisBooker.get_available_times] Launching Playwright browser...")
+                browser = playwright.chromium.launch()
+                context = browser.new_context(java_script_enabled = True)
+                page = context.new_page()
+                logger.debug("[TennisBooker.get_available_times] Browser launched. Navigating to page...")
+
+                page.goto("https://www.rec.us/organizations/san-francisco-rec-park", wait_until="networkidle")
+                page.wait_for_selector("a.no-underline.hover\\:underline", state="attached")
+                logger.debug("[TennisBooker.get_available_times] Initial page loaded.")
+
+                # Find and click the button with the specified classes
+                button_selector = 'button.rounded-2xl.border.border-gray-200.px-4.py-1.hover\\:border-black.bg-gray-200'
                 try:
-                    # Second try: Get all day buttons with the target day text and filter out the one from previous/next month
-                    all_day_buttons = page.locator(f'button[name="day"]:has-text("{target_day}")').all()
-                    
-                    # Debug info
-                    print(f"Found {len(all_day_buttons)} buttons for day {target_day}")
-                    
-                    # Find the first button that doesn't have the day-outside class
-                    current_month_button = None
-                    for button in all_day_buttons:
-                        # Check if this is NOT a day from outside the current month
-                        class_attr = button.get_attribute("class")
-                        if class_attr and "day-outside" not in class_attr and "opacity-50" not in class_attr:
-                            current_month_button = button
-                            break
-                    
-                    if current_month_button:
-                        current_month_button.click()
-                        print(f"Successfully clicked on day {target_day} from current month")
+                    logger.debug("[TennisBooker.get_available_times] Waiting for initial button...")
+                    button = page.wait_for_selector(button_selector, state="visible", timeout=5000)
+                    if button:
+                        logger.debug("[TennisBooker.get_available_times] Clicking initial button...")
+                        button.click()
+                        logger.info("[TennisBooker.get_available_times] Successfully clicked the initial button")
                     else:
-                        # Last resort: just click the nth button
-                        page.locator(f'button[name="day"]:has-text("{target_day}")').nth(1).click()
-                        print(f"Clicked on day {target_day} using nth selector")
-                except Exception as e2:
-                    print(f"All attempts to click day {target_day} failed: {str(e2)}")
-                    page.screenshot(path="day_selection_error.png")
-            
-            # Wait after clicking the day
-            page.wait_for_timeout(5000)
-
-
-            html = page.content()
-            soup = BeautifulSoup(html, "html.parser")
-            for container in soup.find_all('div', class_="rounded-xl border border-gray-200 p-3"):
-                court_name_tag = container.find('p', class_="text-[1rem] font-medium text-black md:text-[1.125rem] mb-1")
-                sport_tag = container.find('p', class_="text-[0.875rem] font-medium text-black md:text-[1rem] mb-2")
+                        logger.warning("[TennisBooker.get_available_times] Initial button selector found no element.")
+                except Exception as e:
+                    logger.error(f"[TennisBooker.get_available_times] Error clicking initial button: {str(e)}", exc_info=True)
+                    page.screenshot(path="button_error.png")
+                    # Decide if we should re-raise or return empty list
+                    return [] # Return empty on error here
                 
-                if court_name_tag and sport_tag:
-                    if court_name_tag.get_text(strip=True) == court_name and sport_tag.get_text(strip=True) == "Tennis":
-                        print(f"Found container for {court_name} playing Tennis")
-                        swiper_wrapper = None
-                        for rel_div in container.select("div.relative"):
-                            potential_swiper = rel_div.find("div", class_="swiper-wrapper")
-                            if potential_swiper:
-                                swiper_wrapper = potential_swiper
+                logger.debug("[TennisBooker.get_available_times] Waiting for calendar...")
+                page.wait_for_selector('.rdp', state="visible")
+                logger.debug("[TennisBooker.get_available_times] Calendar visible. Navigating month...")
+        
+                # Navigate to the correct month
+                navigation_attempts = 0
+                while navigation_attempts < 12: # Limit attempts to prevent infinite loops
+                    # Get current month and year from the calendar
+                    current_month_element = page.locator('div[role="presentation"][id^="react-day-picker-"]')
+                    current_month_text = current_month_element.text_content()
+                    current_month, current_year = current_month_text.strip().split()
+                    logger.debug(f"[TennisBooker.get_available_times] Current calendar month: {current_month} {current_year}")
+                    
+                    # If we're at the correct month and year, break
+                    if current_month == target_month and current_year == target_year:
+                        logger.info(f"[TennisBooker.get_available_times] Target month found: {target_month} {target_year}")
+                        break
+                        
+                    # Click next month button
+                    logger.debug("[TennisBooker.get_available_times] Clicking next month...")
+                    next_month_button = page.locator('button[name="next-month"]')
+                    next_month_button.click()
+                    # Wait for calendar to update
+                    page.wait_for_timeout(500)
+                    navigation_attempts += 1
+                else:
+                    logger.error("[TennisBooker.get_available_times] Failed to navigate to target month after 12 attempts.")
+                    return []
+                
+                # Find and click on the target day
+                try:
+                    # First try: Use the most specific selector for the active day in current month
+                    specific_selector = f'button[name="day"]:has-text("{target_day}"):not(.day-outside):not(.opacity-50)'
+                    logger.debug(f"[TennisBooker.get_available_times] Attempting to click day with selector: {specific_selector}")
+                    page.locator(specific_selector).first.click()
+                    logger.info(f"[TennisBooker.get_available_times] Clicked day {target_day} using primary selector.")
+                except Exception as e:
+                    logger.warning(f"[TennisBooker.get_available_times] Primary day selector failed: {str(e)}. Trying alternatives...")
+                    try:
+                        # Second try: Get all day buttons with the target day text and filter out the one from previous/next month
+                        all_day_buttons = page.locator(f'button[name="day"]:has-text("{target_day}")').all()
+                        logger.debug(f"[TennisBooker.get_available_times] Found {len(all_day_buttons)} buttons matching day {target_day}")
+                        
+                        current_month_button = None
+                        for button in all_day_buttons:
+                            class_attr = button.get_attribute("class")
+                            if class_attr and "day-outside" not in class_attr and "opacity-50" not in class_attr:
+                                current_month_button = button
+                                logger.debug("[TennisBooker.get_available_times] Found valid button for current month.")
                                 break
-                                
-                        if swiper_wrapper:
-                            times_list = []
-                            # Iterate over each swiper slide that has "swiper-slide" in its class
-                            for slide in swiper_wrapper.find_all('div', class_=lambda c: c and 'swiper-slide' in c):
-                                time_tag = slide.find('p', class_="text-[0.875rem] font-medium")
-                                if time_tag:
-                                    time_text = time_tag.get_text(strip=True)
-                                    # Convert from "7:30 AM" format to "07:30" format (24-hour)
-                                    if ":" in time_text:
-                                        try:
-                                            if "AM" in time_text:
-                                                hour = time_text.split(':')[0]
-                                                minute = time_text.split(':')[1].split(' ')[0]
-                                                if len(hour) == 1:
-                                                    hour = f"0{hour}"
-                                                times_list.append(f"{hour}:{minute}")
-                                            elif "PM" in time_text:
-                                                hour = int(time_text.split(':')[0])
-                                                if hour < 12:
-                                                    hour += 12
-                                                minute = time_text.split(':')[1].split(' ')[0]
-                                                times_list.append(f"{hour}:{minute}")
-                                            else:
-                                                # If no AM/PM indicator, just add the raw time
-                                                times_list.append(time_text)
-                                        except Exception as e:
-                                            print(f"Error parsing time '{time_text}': {str(e)}")
-                                            # Add the raw time as fallback
-                                            times_list.append(time_text)
-                            print("Extracted times:", times_list)
-                            return times_list
+                        
+                        if current_month_button:
+                            current_month_button.click()
+                            logger.info(f"[TennisBooker.get_available_times] Clicked day {target_day} using secondary selector.")
                         else:
-                            print("Swiper wrapper not found in this container.")
+                            # Last resort: just click the nth button (careful, this is brittle)
+                            logger.warning("[TennisBooker.get_available_times] Secondary day selector failed. Trying nth(1) fallback.")
+                            page.locator(f'button[name="day"]:has-text("{target_day}")').nth(1).click()
+                            logger.info(f"[TennisBooker.get_available_times] Clicked day {target_day} using nth(1) selector.")
+                    except Exception as e2:
+                        logger.error(f"[TennisBooker.get_available_times] All attempts to click day {target_day} failed: {str(e2)}", exc_info=True)
+                        page.screenshot(path="day_selection_error.png")
+                        return []
+                
+                # Wait after clicking the day for content to load
+                logger.debug("[TennisBooker.get_available_times] Waiting for court times to load after day click...")
+                page.wait_for_timeout(5000) # Consider adjusting or using explicit waits if possible
+
+                logger.debug("[TennisBooker.get_available_times] Parsing page content for courts and times...")
+                html = page.content()
+                soup = BeautifulSoup(html, "html.parser")
+                times_list = []
+                found_court = False
+                
+                for container in soup.find_all('div', class_="rounded-xl border border-gray-200 p-3"):
+                    court_name_tag = container.find('p', class_="text-[1rem] font-medium text-black md:text-[1.125rem] mb-1")
+                    sport_tag = container.find('p', class_="text-[0.875rem] font-medium text-black md:text-[1rem] mb-2")
+                    
+                    if court_name_tag and sport_tag:
+                        current_court_name = court_name_tag.get_text(strip=True)
+                        current_sport = sport_tag.get_text(strip=True)
+                        logger.debug(f"[TennisBooker.get_available_times] Checking container: Court='{current_court_name}', Sport='{current_sport}'")
+                        
+                        if current_court_name == court_name and current_sport == "Tennis":
+                            logger.info(f"[TennisBooker.get_available_times] Found target court container: '{court_name}'")
+                            found_court = True
+                            swiper_wrapper = None
+                            for rel_div in container.select("div.relative"):
+                                potential_swiper = rel_div.find("div", class_="swiper-wrapper")
+                                if potential_swiper:
+                                    swiper_wrapper = potential_swiper
+                                    logger.debug("[TennisBooker.get_available_times] Found swiper-wrapper.")
+                                    break
+                                    
+                            if swiper_wrapper:
+                                # Iterate over each swiper slide that has "swiper-slide" in its class
+                                for slide in swiper_wrapper.find_all('div', class_=lambda c: c and 'swiper-slide' in c):
+                                    time_tag = slide.find('p', class_="text-[0.875rem] font-medium")
+                                    if time_tag:
+                                        time_text = time_tag.get_text(strip=True)
+                                        logger.debug(f"[TennisBooker.get_available_times] Found raw time text: '{time_text}'")
+                                        # Convert from "7:30 AM" format to "07:30" format (24-hour)
+                                        if ":" in time_text:
+                                            try:
+                                                parsed_time = datetime.strptime(time_text, "%I:%M %p") # e.g., 7:30 AM
+                                                formatted_time = parsed_time.strftime("%H:%M") # e.g., 07:30
+                                                times_list.append(formatted_time)
+                                                logger.debug(f"[TennisBooker.get_available_times] Parsed time: {formatted_time}")
+                                            except ValueError:
+                                                # Handle cases like '12:00 PM' which might need special handling or just use raw
+                                                try:
+                                                     parsed_time = datetime.strptime(time_text, "%I:%M") # Handle case without AM/PM maybe?
+                                                     formatted_time = parsed_time.strftime("%H:%M")
+                                                     times_list.append(formatted_time)
+                                                     logger.warning(f"[TennisBooker.get_available_times] Parsed time '{time_text}' without AM/PM to {formatted_time}")
+                                                except ValueError:
+                                                     logger.error(f"[TennisBooker.get_available_times] Error parsing time '{time_text}'. Appending raw.", exc_info=False)
+                                                     times_list.append(time_text) # Add raw time as fallback
+                                        else:
+                                             logger.warning(f"[TennisBooker.get_available_times] Time text '{time_text}' does not contain ':'. Skipping parsing.")
+                                             # Decide if you want to add non-standard times or ignore them
+                                             # times_list.append(time_text)
+                                else:
+                                     logger.debug("[TennisBooker.get_available_times] Slide found without time tag.")
+                            else:
+                                logger.warning("[TennisBooker.get_available_times] Swiper wrapper not found in the target court container.")
+                            # Found the target court, no need to check other containers
+                            break 
+                
+                if not found_court:
+                    logger.warning(f"[TennisBooker.get_available_times] Container for court '{court_name}' was not found on the page.")
+
+                logger.info(f"[TennisBooker.get_available_times] FINISHED. Extracted times: {times_list}")
+                return times_list
+
+            except Exception as e:
+                logger.error(f"[TennisBooker.get_available_times] An unexpected error occurred during scraping: {str(e)}", exc_info=True)
+                page.screenshot(path="scraping_error.png") # Capture state on error
+                return [] # Return empty list on error
+            finally:
+                 if browser:
+                      logger.debug("[TennisBooker.get_available_times] Closing Playwright browser.")
+                      browser.close()
 
 if __name__ == "__main__":
     # Configure logging to show debug messages

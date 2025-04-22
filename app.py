@@ -243,48 +243,95 @@ def schedule_booking():
                 playtime_duration = 60
             
             # Attempt booking
+            logger.info(f"Attempting immediate booking for attempt {attempt_data['id']}...")
             success, error = booker.book_court(
                 court_name, 
                 booking_time, 
                 playtime_duration=playtime_duration
             )
             
-            # Update attempt status
+            # Update attempt status based on immediate attempt
             status = 'completed' if success else 'failed'
             error_message = error if error else None
+            # Log the immediate result before potentially scheduling
+            logger.debug(f"Updating booking attempt {attempt_data['id']} status to '{status}' after immediate attempt.")
             BookingAttempt.update_status(attempt_data["id"], status, error_message)
             
             if success:
+                logger.info(f"Immediate booking successful for attempt {attempt_data['id']}")
                 return jsonify({
                     'status': 'success',
                     'message': 'Court booked successfully'
                 })
             else:
-                # If immediate booking fails, still schedule it for the future as a backup
-                logger.warning(f"Immediate booking failed: {error}. Scheduling for the future.")
+                # Immediate booking failed, schedule it for the future as a backup
+                logger.warning(f"Immediate booking failed for attempt {attempt_data['id']}: {error}. Scheduling for the future.")
+                # Schedule the booking attempt with a unique job ID
+                job_id = f'booking_{attempt_data["id"]}_{booking_time.strftime("%Y%m%d_%H%M")}'
+                try:
+                    scheduler.add_job(
+                        func='scheduler:booking_job',  # Use string reference to function
+                        trigger='date',
+                        run_date=booking_time,
+                        args=[attempt_data["id"]],
+                        id=job_id,
+                        replace_existing=True # Avoid duplicate jobs if somehow triggered again
+                    )
+                    # Update status to 'scheduled' since immediate failed but scheduling worked
+                    # Keep the original error message about the immediate failure
+                    logger.info(f"Successfully scheduled future booking job {job_id} despite immediate failure.")
+                    BookingAttempt.update_status(attempt_data["id"], 'scheduled', error_message) 
+                    # Return success status but with a specific message
+                    return jsonify({
+                        'status': 'success', # Keep status success for frontend simplicity
+                        'message': f'Immediate booking failed ({error_message or "reason unknown"}).' # Simplified message
+                    })
+                except Exception as scheduler_error:
+                    # Immediate booking failed AND scheduling failed
+                    full_error = f"Immediate fail: {error_message}. Scheduler fail: {str(scheduler_error)}"
+                    logger.error(f"Immediate booking failed AND scheduler error for attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
+                    BookingAttempt.update_status(attempt_data["id"], 'failed', full_error)
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Immediate booking failed and failed to schedule future attempt: {str(scheduler_error)}'
+                    }), 500
         
-        # Schedule the booking attempt with a unique job ID
+        # This part is now only reached if days_difference > 7
+        logger.info(f"Booking date is > 7 days away ({days_difference} days). Scheduling job.")
         job_id = f'booking_{attempt_data["id"]}_{booking_time.strftime("%Y%m%d_%H%M")}'
-
         try:
             scheduler.add_job(
                 func='scheduler:booking_job',  # Use string reference to function
                 trigger='date',
                 run_date=booking_time,
                 args=[attempt_data["id"]],
-                id=job_id
+                id=job_id,
+                replace_existing=True
             )
+            logger.info(f"Successfully scheduled future booking job {job_id}.")
+            # Ensure attempt status is 'scheduled'
+            BookingAttempt.update_status(attempt_data["id"], 'scheduled') 
+            return jsonify({
+                'status': 'success',
+                'message': 'Booking successfully scheduled for the future.' # Provide specific message
+                })
         except Exception as scheduler_error:
-            logger.error(f"Scheduler error: {str(scheduler_error)}")
-            attempt.update_status('failed', f"Failed to schedule: {str(scheduler_error)}")
+            logger.error(f"Scheduler error for future booking attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
+            BookingAttempt.update_status(attempt_data["id"], 'failed', f"Failed to schedule: {str(scheduler_error)}")
             return jsonify({
                 'status': 'error',
                 'message': 'Failed to schedule booking'
             }), 500
 
-        return jsonify({'status': 'success'})
     except Exception as e:
-        logger.error(f"Error scheduling booking: {str(e)}")
+        logger.error(f"Error in schedule_booking endpoint: {str(e)}", exc_info=True)
+        # Attempt to find the attempt_id if it exists to mark as failed
+        attempt_id = locals().get('attempt_data', {}).get('id')
+        if attempt_id:
+             try:
+                 BookingAttempt.update_status(attempt_id, 'failed', f"Error in submission: {str(e)}")
+             except Exception as update_err:
+                 logger.error(f"Failed to update attempt status on error: {update_err}")
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -296,68 +343,83 @@ def get_available_times():
         data = request.get_json()
         court_name = data.get('court_name')
         date_str = data.get('date')
-        
+        logger.debug(f"[get_available_times] Received request for court: '{court_name}', date: '{date_str}'")
+
         if not court_name or not date_str:
+            logger.warning("[get_available_times] Missing court_name or date_str")
             return jsonify({
                 'status': 'error',
                 'message': 'Court name and date are required'
             }), 400
-            
+
         # Get current date in SF timezone
         sf_timezone = ZoneInfo("America/Los_Angeles")
         now = datetime.now(sf_timezone)
         today = datetime(now.year, now.month, now.day, tzinfo=sf_timezone)
-        
+
         # Parse the selected date
         selected_date = datetime.strptime(date_str, '%Y-%m-%d')
         selected_date = selected_date.replace(tzinfo=sf_timezone)
-        
+        logger.debug(f"[get_available_times] Parsed selected_date: {selected_date}")
+
         # Calculate the difference in days
         days_difference = (selected_date - today).days
-        
+        logger.debug(f"[get_available_times] Calculated days_difference: {days_difference}")
+
         # If within a week, scrape available times
         if days_difference <= 7:
-            # Get the most recent preferences to use credentials
-            pref = BookingPreference.get_latest()
-            
-            if not pref:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'No booking preferences found. Please set your preferences first.'
-                }), 400
-                
-            # Initialize TennisBooker with credentials
-            booker = TennisBooker(pref['rec_account_email'], pref['rec_account_password'])
-            
+            logger.info("[get_available_times] Date is within 7 days. Attempting to scrape publicly.")
+            # Initialize TennisBooker with placeholder credentials for public scraping
+            # Actual credentials from preferences are only needed for booking, not viewing times.
+            logger.debug("[get_available_times] Initializing TennisBooker with dummy credentials for scraping...")
+            # Use dummy values, as get_available_times likely doesn't need login
+            booker = TennisBooker(email="dummy@example.com", password="dummypass") 
+
             # Get available times
-            available_times = booker.get_available_times(court_name, date_str)
-            
-            return jsonify({
-                'status': 'success',
-                'times': available_times,
-                'is_scraped': True
-            })
+            logger.debug(f"[get_available_times] Calling booker.get_available_times for {court_name}, {date_str}...")
+            try:
+                available_times = booker.get_available_times(court_name, date_str)
+                logger.info(f"[get_available_times] Scraper returned {len(available_times)} times: {available_times}")
+
+                response_data = {
+                    'status': 'success',
+                    'times': available_times,
+                    'is_scraped': True
+                }
+                logger.debug(f"[get_available_times] Sending response: {response_data}")
+                return jsonify(response_data)
+            except Exception as scraper_error:
+                 logger.error(f"[get_available_times] Error during scraping: {str(scraper_error)}", exc_info=True)
+                 # Return error but indicate it was a scraping issue
+                 return jsonify({
+                    'status': 'error',
+                    'message': 'Could not retrieve real-time availability. The booking site may be down or changed.'
+                 }), 500
         else:
             # For dates beyond a week, return standard 30-minute intervals
+            logger.info("[get_available_times] Date is > 7 days away. Returning standard intervals.")
             standard_times = []
             current_time = datetime(2023, 1, 1, 9, 0)  # Start at 9:00 AM
             end_time = datetime(2023, 1, 1, 18, 0)     # End at 6:00 PM
-            
+
             while current_time <= end_time:
                 standard_times.append(current_time.strftime('%H:%M'))
                 current_time += timedelta(minutes=30)
-                
-            return jsonify({
+            logger.debug(f"[get_available_times] Generated standard_times: {standard_times}")
+            
+            response_data = {
                 'status': 'success',
                 'times': standard_times,
                 'is_scraped': False
-            })
-            
+            }
+            logger.debug(f"[get_available_times] Sending response: {response_data}")
+            return jsonify(response_data)
+
     except Exception as e:
-        logger.error(f"Error getting available times: {str(e)}")
+        logger.error(f"[get_available_times] Error getting available times: {str(e)}", exc_info=True) # Log traceback
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': f"An error occurred: {str(e)}" # Provide error details
         }), 500
 
 @app.route('/get-available-times-for-preferences', methods=['POST'])
