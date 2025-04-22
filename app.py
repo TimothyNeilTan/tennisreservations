@@ -213,6 +213,56 @@ def schedule_booking():
                 'message': 'Failed to create booking attempt'
             }), 500
 
+        # Calculate days difference between booking date and today
+        days_difference = (booking_date - today).days
+
+        # If booking is within a week, attempt to book immediately
+        if days_difference <= 7:
+            logger.info(f"Booking date is within a week ({days_difference} days from today). Attempting immediate booking.")
+            
+            # Get booking preferences
+            pref = BookingPreference.get_latest()
+            
+            if not pref:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'No booking preferences found. Please set your preferences first.'
+                }), 400
+            
+            # Get the email and password from preferences
+            email = pref['rec_account_email']
+            password = pref['rec_account_password']
+            
+            # Initialize TennisBooker with credentials
+            booker = TennisBooker(email, password)
+            
+            # Get playtime duration (default to 60 minutes if not set or invalid)
+            playtime_duration = pref.get('playtime_duration', 60)
+            if playtime_duration not in [60, 90]:
+                logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
+                playtime_duration = 60
+            
+            # Attempt booking
+            success, error = booker.book_court(
+                court_name, 
+                booking_time, 
+                playtime_duration=playtime_duration
+            )
+            
+            # Update attempt status
+            status = 'completed' if success else 'failed'
+            error_message = error if error else None
+            BookingAttempt.update_status(attempt_data["id"], status, error_message)
+            
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Court booked successfully'
+                })
+            else:
+                # If immediate booking fails, still schedule it for the future as a backup
+                logger.warning(f"Immediate booking failed: {error}. Scheduling for the future.")
+        
         # Schedule the booking attempt with a unique job ID
         job_id = f'booking_{attempt_data["id"]}_{booking_time.strftime("%Y%m%d_%H%M")}'
 

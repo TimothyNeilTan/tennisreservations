@@ -15,7 +15,7 @@ class ReservationBot:
         self.email = email
         self.password = password
         self.url = "https://www.rec.us/organizations/san-francisco-rec-park"
-        self.test_date = "2025-04-22"
+        self.test_date = "2025-04-28"
         self.target_time_primary = "1:00"
         self.target_time_alternate = "1:30"
         
@@ -27,7 +27,7 @@ class ReservationBot:
 
     def run(self):
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=False)
+            browser = playwright.chromium.launch(headless=True)
             context = browser.new_context(java_script_enabled=True)
             page = context.new_page()
 

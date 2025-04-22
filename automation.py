@@ -19,9 +19,10 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class TennisBooker:
-    def __init__(self, email: str, password: str):
+    def __init__(self, email: str, password: str, user_id: str = None):
         self.email = email
         self.password = password
+        self.user_id = user_id
 
     def setup_driver(self):
         """Initialize and configure Chrome WebDriver"""
@@ -63,79 +64,261 @@ class TennisBooker:
         if playtime_duration not in [60, 90]:
             logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
             playtime_duration = 60
-            
-        try:
-            with sync_playwright() as playwright:
-                # Launch browser
-                browser = playwright.chromium.launch(headless=True)
-                context = browser.new_context()
-                page = context.new_page()
+        
+        logger.info(f"Starting booking process for court: {court_name}, time: {booking_time}, duration: {playtime_duration}")
+        
+        # Format target date
+        target_date = booking_time
+        target_day = target_date.strftime("%d")
+        target_month = target_date.strftime("%B")
+        target_year = target_date.strftime("%Y")
+        
+        # Extract time for direct matching - exactly like test.py does
+        target_time_primary = target_date.strftime("%-I:%M")  # Format like "7:30" without leading zero
+        target_time_alternate = None  # Could add an alternate time option if needed
+        
+        logger.info(f"Target date: {target_month} {target_day}, {target_year}, time: {target_time_primary}")
+        
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            context = browser.new_context(java_script_enabled=True)
+            page = context.new_page()
 
-                # Go to login page
-                page.goto("https://www.rec.us/login")
+            try:
+                # Initial page load
+                logger.debug("Loading initial page")
+                page.goto("https://www.rec.us/organizations/san-francisco-rec-park", wait_until="networkidle")
+                page.wait_for_selector("a.no-underline.hover\\:underline", state="attached", timeout=3000)
                 
-                # Login
-                page.fill('input[type="email"]', self.email)
-                page.fill('input[type="password"]', self.password)
-                page.click('button[type="submit"]')
+                # Click initial button
+                logger.debug("Looking for initial booking button")
+                button = page.wait_for_selector('button.rounded-2xl.border.border-gray-200.px-4.py-1.hover\\:border-black.bg-gray-200', 
+                                             state="visible", timeout=3000)
+                if button:
+                    button.click()
 
-                # Wait for login to complete
-                page.wait_for_navigation()
-
-                # Go to SF Rec & Park page
-                page.goto("https://www.rec.us/organizations/san-francisco-rec-park")
+                # Calendar navigation
+                page.wait_for_selector('.rdp', state="visible", timeout=3000)
                 
-                # Find and click on the specific court
-                court_selector = f'//p[contains(text(), "{court_name}")]'
-                page.wait_for_selector(court_selector, state="visible")
-                page.click(court_selector)
+                logger.debug(f"Navigating to month: {target_month} {target_year}")
+                while True:
+                    current_month_element = page.locator('div[role="presentation"][id^="react-day-picker-"]')
+                    current_month_text = current_month_element.text_content()
+                    current_month, current_year = current_month_text.strip().split()
+                    
+                    if current_month == target_month and current_year == target_year:
+                        break
+                        
+                    logger.debug("Clicking next month button")
+                    next_month_button = page.locator('button[name="next-month"]')
+                    next_month_button.click()
+                    page.wait_for_timeout(200)
 
-                # Wait for calendar to load
-                page.wait_for_selector('.calendar-day', state="visible")
+                # Click target day
+                day_button = page.locator(f'button[name="day"]:has-text("{target_day}"):not(.day-outside):not(.opacity-50)').first
+                day_button.click()
+                page.wait_for_timeout(1000)
 
-                # Format the booking time for selection
-                booking_date = booking_time.strftime("%Y-%m-%d")
-                booking_hour = booking_time.strftime("%I:%M %p")
-
-                # Click on the date
-                date_selector = f'[data-date="{booking_date}"]'
-                page.wait_for_selector(date_selector)
-                page.click(date_selector)
-
-                # Click on the time slot
-                time_selector = f'//button[contains(text(), "{booking_hour}")]'
-                page.wait_for_selector(time_selector)
-                page.click(time_selector)
+                # Find and click time slot
+                target_time_clicked = False
+                page.wait_for_selector('div.rounded-xl.border.border-gray-200.p-3', state="visible", timeout=3000)
                 
-                # Select the duration if available
-                try:
-                    # Look for duration options
-                    duration_selector = f'//button[contains(text(), "{playtime_duration} min")]'
-                    duration_element = page.wait_for_selector(duration_selector, timeout=5000)
-                    if duration_element:
-                        duration_element.click()
-                        logger.info(f"Selected {playtime_duration} minutes duration")
-                    else:
-                        logger.warning(f"Duration option for {playtime_duration} minutes not found, using default")
-                except Exception as duration_error:
-                    logger.warning(f"Could not select duration: {str(duration_error)}")
-
-                # Click reserve button
-                page.click('button:has-text("Reserve")')
-
-                # Wait for confirmation and get success message
-                success_message = page.wait_for_selector('.success-message', timeout=10000)
+                court_containers = page.query_selector_all('div.rounded-xl.border.border-gray-200.p-3')
                 
-                if success_message:
-                    return True, "Court booked successfully"
+                # Save HTML for debugging
+                page.screenshot(path="debug_court_listing.png")
+                
+                for container in court_containers:
+                    court_name_elem = container.query_selector('p.text-\\[1rem\\].font-medium.text-black.md\\:text-\\[1\\.125rem\\].mb-1')
+                    sport_elem = container.query_selector('p.text-\\[0\\.875rem\\].font-medium.text-black.md\\:text-\\[1rem\\].mb-2')
+                    
+                    if not court_name_elem or not sport_elem:
+                        continue
+                    
+                    current_court = court_name_elem.text_content()
+                    sport_type = sport_elem.text_content()
+                    
+                    # Check if this is our target court
+                    if court_name in current_court and "Tennis" in sport_type:
+                        
+                        time_slots = container.query_selector_all('div.swiper-slide p.text-\\[0\\.875rem\\].font-medium')
+                        available_times = [slot.text_content() for slot in time_slots]
+                        
+                        # Try to find and click our target time
+                        for i, time_text in enumerate(available_times):
+                            if target_time_primary in time_text:
+                                swiper_slides = container.query_selector_all('div.swiper-slide')
+                                if i < len(swiper_slides):
+                                    logger.debug(f"Clicking time slot {i}")
+                                    swiper_slides[i].click()
+                                    target_time_clicked = True
+                                    break
+                        
+                        # If we have an alternate time and primary wasn't found
+                        if not target_time_clicked and target_time_alternate:
+                            for i, time_text in enumerate(available_times):
+                                if target_time_alternate in time_text:
+                                    logger.debug(f"Found alternate time: {time_text}")
+                                    swiper_slides = container.query_selector_all('div.swiper-slide')
+                                    if i < len(swiper_slides):
+                                        logger.debug(f"Clicking alternate time slot {i}")
+                                        swiper_slides[i].click()
+                                        target_time_clicked = True
+                                        break
+                        
+                        break
+
+                if not target_time_clicked:
+                    return False, f"No matching time slot found for {target_time_primary}"
+
+                # Book button
+                book_button = page.wait_for_selector('button.bg-\\[\\#26E164\\]:has-text("Book")', state="visible", timeout=2000)
+                if book_button:
+                    book_button.click()
+                    page.wait_for_timeout(1000)
                 else:
-                    return False, "Booking confirmation not received"
+                    return False, "Book button not found"
+                
+                # Login process
+                login_button = page.wait_for_selector('button.font-bold.text-brand-neutral:has-text("Log In")', state="visible", timeout=2000)
+                if login_button:
+                    login_button.click()
+                    page.wait_for_timeout(1000)
+                else:
+                    page.screenshot(path="debug_no_login_button.png")
+                    return False, "Login button not found"
+                
+                # Fill login form
+                email_input = page.wait_for_selector('input#email', state="visible", timeout=2000)
+                password_input = page.wait_for_selector('input#password', state="visible", timeout=2000)
+                
+                if email_input and password_input:
+                    email_input.fill(self.email)
+                    password_input.fill(self.password)
+                    
+                    # Submit login
+                    submit_button = page.wait_for_selector('button[type="submit"]', state="visible", timeout=2000)
+                    if submit_button:
+                        submit_button.click()
+                        page.wait_for_timeout(2000)
+                    else:
+                        logger.error("Submit button not found")
+                        return False, "Submit button not found"
+                else:
+                    logger.error("Email or password input not found")
+                    return False, "Email or password input not found"
+                
+                # Select participant
+                try:
+                    participant_selector = page.wait_for_selector('button[id^="headlessui-listbox-button"]', 
+                                                              state="visible", 
+                                                              timeout=5000)
+                    
+                    if participant_selector:
+                        participant_selector.click()
+                        page.wait_for_timeout(1000)  # Increased wait time after click
+                        account_owner = page.wait_for_selector('div.flex.w-full.items-center:has(small:has-text("Account Owner"))', 
+                                                            state="visible", 
+                                                            timeout=3000)
+                        if account_owner:
+                            account_owner.click()
+                            page.wait_for_timeout(1000)  # Increased wait time
+                        else:
+                            logger.error("Account Owner option not found")
+                            try:
+                                alt_account_owner = page.wait_for_selector('div.flex.items-center:has-text("Account Owner")', 
+                                                                       state="visible", 
+                                                                       timeout=2000)
+                                if alt_account_owner:
+                                    alt_account_owner.click()
+                                    page.wait_for_timeout(1000)
+                                else:
+                                    return False, "Account Owner option not found (both selectors)"
+                            except Exception as e:
+                                logger.error(f"Alternative account owner selector failed: {str(e)}")
+                                return False, "Account Owner option not found"
+                    else:
+                        logger.error("Participant selector not found even with increased timeout")
+                        return False, "Participant selector not found"
+                        
+                except Exception as e:
+                    logger.error(f"Error during participant selection: {str(e)}")
+                
+                # Click Book button again
+                book_button = page.wait_for_selector('button.bg-\\[\\#26E164\\]:has-text("Book")', state="visible", timeout=2000)
+                if book_button:
+                    book_button.click()
+                    page.wait_for_timeout(1000)
+                else:
+                    page.screenshot(path="debug_no_second_book_button.png")
+                    return False, "Second Book button not found"
+                
+                send_code_button = page.wait_for_selector('button[type="submit"]:has-text("Send Code")', 
+                                                     state="visible", timeout=2000)
+                if send_code_button:
+                    send_code_button.click()
+                    page.wait_for_timeout(1000)
+                else:
+                    logger.error("Send Code button not found")
+                    return False, "Send Code button not found"
+                
+                # Wait for code input
+                code_input = page.wait_for_selector('input#totp[name="totp"][type="number"]', 
+                                               state="visible", timeout=5000)
+                if code_input:
+                    # Poll for code
+                    max_attempts = 10
+                    verification_code = None
+                    
+                    logger.debug(f"Polling for verification code, user_id: {self.user_id}")
+                    for attempt in range(max_attempts):
+                        try:
+                            logger.debug(f"Code polling attempt {attempt+1}/{max_attempts}")
+                            response = requests.get(f'http://localhost:8000/get_code?user_id={self.user_id}')
+                            if response.status_code == 200:
+                                data = response.json()
+                                logger.debug(f"Code poll response: {data}")
+                                if data.get('status') == 'available':
+                                    verification_code = data.get('code')
+                                    logger.debug(f"Verification code received: {verification_code}")
+                                    break
+                        except Exception as e:
+                            logger.error(f"Error checking for code: {str(e)}")
+                        
+                        time.sleep(1)
+                    
+                    if verification_code:
+                        logger.debug(f"Filling code input with: {verification_code}")
+                        code_input.fill(verification_code)
+                        
+                        # Click Confirm button
+                        logger.debug("Looking for Confirm button")
+                        confirm_button = page.wait_for_selector('button[type="button"]:has-text("Confirm")', 
+                                                           state="visible", timeout=2000)
+                        if confirm_button:
+                            logger.debug("Clicking Confirm button")
+                            confirm_button.click()
+                            page.wait_for_timeout(2000)
+                            logger.info("Court booked successfully")
+                            return True, "Court booked successfully"
+                        else:
+                            logger.error("Confirm button not found")
+                            page.screenshot(path="debug_no_confirm_button.png")
+                            return False, "Confirm button not found"
+                    else:
+                        logger.error(f"No verification code received after {max_attempts} attempts")
+                        return False, f"No verification code received after {max_attempts} attempts"
+                else:
+                    logger.error("Code input field not found")
+                    return False, "Code input field not found"
+                
+            except Exception as e:
+                error_msg = f"Booking failed with exception: {str(e)}"
+                logger.error(error_msg)
+                return False, error_msg
+            finally:
+                browser.close()
 
-        except Exception as e:
-            error_msg = f"Booking failed: {str(e)}"
-            logger.error(error_msg)
-            return False, error_msg
-    
     def get_available_times(self, court_name: str, date_str: str) -> List[str]:
         """
         Get available time slots for a specific court and date.
