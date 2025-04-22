@@ -1,139 +1,217 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8 offset-md-2">
-        <div class="card">
-            <div class="card-header">
-                <h4>Schedule Tennis Court Booking</h4>
-            </div>
-            <div class="card-body">
-                <form id="bookingForm">
-                    <div class="mb-3">
-                        <label for="courtName" class="form-label">Court Name</label>
-                        <select class="form-select" id="courtName" required>
-                            <option value="">Select a court</option>
-                            {% for court in courts %}
-                            <option value="{{ court.name }}">{{ court.name }}</option>
-                            {% endfor %}
+{# Centered container using Tailwind #}
+<div class="max-w-3xl mx-auto">
+    {# Main card/panel styling - Use zinc for dark bg #}
+    <div class="bg-white dark:bg-zinc-800 shadow-md rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-zinc-700">
+            <h4 class="text-xl font-semibold text-gray-900 dark:text-white">Schedule Tennis Court Booking</h4>
+        </div>
+        <div class="px-6 py-6">
+            <form id="bookingForm" class="space-y-6">
+                {# Court Selection - Use zinc for dark bg/border, brand for focus #}
+                <div>
+                    <label for="courtName" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Court Name</label>
+                    <select id="courtName" name="courtName" required 
+                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                        <option value="">Select a court</option>
+                        {% for court in courts %}
+                        <option value="{{ court.name }}">{{ court.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Booking Date - Use zinc for dark bg/border, brand for focus #}
+                <div>
+                    <label for="bookingDate" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Booking Date</label>
+                    <input type="date" id="bookingDate" name="bookingDate" required 
+                           class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                </div>
+
+                {# User Info Section - Use zinc for dark border #}
+                <div class="border border-gray-200 dark:border-zinc-700 rounded-md p-4 space-y-4">
+                    <h5 class="text-lg font-medium text-gray-900 dark:text-white">User Information</h5>
+                    {# Email - Use zinc for dark bg/border, brand for focus #}
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Email Address</label>
+                        <input type="email" id="email" name="email" placeholder="user@example.com" required
+                               value="{% if preferences and preferences.rec_account_email %}{{ preferences.rec_account_email }}{% endif %}"
+                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your SF Rec & Park account email.</p>
+                    </div>
+                    
+                    {# Password - Use zinc for dark bg/border, brand for focus #}
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Password</label>
+                        <input type="password" id="password" name="password" required
+                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your SF Rec & Park account password.</p>
+                    </div>
+                    
+                    {# Phone - Use zinc for dark bg/border, brand for focus #}
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="(123) 456-7890" required
+                               value="{% if preferences and preferences.phone_number %}{{ preferences.phone_number }}{% endif %}"
+                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your phone number for booking notifications.</p>
+                    </div>
+                    
+                    {# Duration - Use zinc for dark bg/border, brand for focus #}
+                    <div>
+                        <label for="playtimeDuration" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Playtime Duration</label>
+                        <select id="playtimeDuration" name="playtimeDuration" required
+                                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                            <option value="60" {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
+                            <option value="90" {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
                         </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">How long you want to play.</p>
                     </div>
+                </div>
 
-                    <div class="mb-3">
-                        <label for="bookingDate" class="form-label">Booking Date</label>
-                        <input type="date" class="form-control" id="bookingDate" required>
+                {# Available Times Section - Use zinc for dark border/bg, brand for focus #}
+                <div class="border border-gray-200 dark:border-zinc-700 rounded-md">
+                     <div class="bg-gray-50 dark:bg-zinc-700 px-4 py-3 border-b border-gray-200 dark:border-zinc-600 flex justify-between items-center rounded-t-md">
+                        <span class="text-lg font-medium text-gray-900 dark:text-white">Available Times</span>
+                        <button type="button" id="refreshAvailableTimes" 
+                                class="inline-flex items-center px-2.5 py-1.5 border border-gray-300 dark:border-zinc-500 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-zinc-200 bg-white dark:bg-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:focus:ring-offset-zinc-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M15 15h-5.418" />
+                            </svg>
+                            Refresh
+                        </button>
                     </div>
-
-                    <!-- User Info Section -->
-                    <div class="card mb-3 border-primary">
-                        <div class="card-header bg-primary text-white">
-                            User Information
+                    <div class="p-4">
+                        <div id="availableTimesLoading" class="text-center py-4" style="display: none;">
+                            {# Spinner using brand color #}
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500 mx-auto"></div>
+                            <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400">Loading available times...</p>
                         </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="email" placeholder="user@example.com" required
-                                    value="{% if preferences and preferences.rec_account_email %}{{ preferences.rec_account_email }}{% endif %}">
-                                <div class="form-text">Your SF Rec & Park account email.</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Password</label>
-                                <input type="password" class="form-control" id="password" required>
-                                <div class="form-text">Your SF Rec & Park account password.</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" placeholder="(123) 456-7890" required
-                                    value="{% if preferences and preferences.phone_number %}{{ preferences.phone_number }}{% endif %}">
-                                <div class="form-text">Your phone number for booking notifications.</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="playtimeDuration" class="form-label">Playtime Duration</label>
-                                <select class="form-select" id="playtimeDuration" required>
-                                    <option value="60" {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
-                                    <option value="90" {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
-                                </select>
-                                <div class="form-text">How long you want to play.</div>
-                            </div>
+                        <div id="availableTimesError" class="p-4 mb-4 text-sm text-yellow-700 bg-yellow-100 rounded-lg dark:bg-yellow-200 dark:text-yellow-800" role="alert" style="display: none;">
+                            No available times found or error fetching times. Please select a court and date, then refresh.
+                        </div>
+                        <div id="availableTimesList">
+                            <p class="text-sm text-gray-500 dark:text-zinc-400">Select a court and date to see available times.</p>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Available Times Section -->
-                    <div class="mb-3">
-                        <label class="form-label">Available Times</label>
-                        <div class="card mb-3 border-info">
-                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                                <span>Available Times</span>
-                                <button type="button" id="refreshAvailableTimes" class="btn btn-sm btn-light">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div id="availableTimesLoading" class="text-center" style="display: none;">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p>Loading available times...</p>
-                                </div>
-                                <div id="availableTimesError" class="alert alert-warning" style="display: none;">
-                                    No available times found. Please select a court and date.
-                                </div>
-                                <div id="availableTimesList">
-                                    <p class="text-muted">Select a court and date to see available times.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                {# Hidden input to store the selected time #}
+                <input type="hidden" id="selectedTime" name="selectedTime" value="">
 
-                    <!-- Hidden input to store the selected time -->
-                    <input type="hidden" id="selectedTime" name="selectedTime" value="">
-
-                    <button type="submit" class="btn btn-primary">Schedule Booking</button>
-                </form>
-            </div>
+                {# Submit Button - Use arbitrary value for specific green #}
+                <div>
+                    <button type="submit" 
+                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#006239] hover:bg-[#00522f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 dark:focus:ring-offset-zinc-800">
+                        Schedule Booking
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+{# Update spinner color in overlay styles #}
 <style>
-    /* Full-page loading overlay */
+    /* Prefer Tailwind for overlay, but keep this as fallback/transition */
     #bookingLoadingOverlay {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
+        /* Slightly transparent background */
         background-color: rgba(255, 255, 255, 0.9);
         z-index: 9999;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        display: none;
+        display: none; /* Initially hidden */
+    }
+    /* Dark mode overlay background */
+    .dark #bookingLoadingOverlay {
+        background-color: rgba(39, 39, 42, 0.9); /* Tailwind zinc-800 with opacity */
     }
     
-    #bookingLoadingOverlay .spinner-border {
-        width: 4rem;
-        height: 4rem;
+    #bookingLoadingOverlay .spinner {
+        width: 4rem; /* w-16 */
+        height: 4rem; /* h-16 */
+        border-top-color: transparent;
+        border-right-color: transparent;
+        border-style: solid;
+        border-width: 4px; /* border-4 */
+        border-radius: 50%; /* rounded-full */
+        animation: spin 1s linear infinite;
+        /* Use brand color (Emerald-600) */
+        border-left-color: #059669; 
+        border-bottom-color: #059669; 
     }
-    
+
     #bookingLoadingOverlay p {
-        margin-top: 1rem;
-        font-size: 1.2rem;
+        margin-top: 1rem; /* mt-4 */
+        font-size: 1.2rem; /* text-lg */
+        color: #1f2937; /* gray-800 */
+    }
+    .dark #bookingLoadingOverlay p {
+        color: #e4e4e7; /* zinc-200 */
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Styling for the time radio buttons - Use brand color for selected state */
+    #availableTimesList label {
+        display: block;
+        padding: 0.5rem 0.75rem; /* py-2 px-3 */
+        border: 1px solid #d1d5db; /* border-gray-300 */
+        border-radius: 0.375rem; /* rounded-md */
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        font-size: 0.875rem; /* text-sm */
+        color: #ffffff; /* text-gray-700 */
+    }
+    .dark #availableTimesList label {
+        border-color: #52525b; /* dark:border-zinc-600 */
+        color: #f4f4f5; /* dark:text-zinc-100 */
+    }
+
+    #availableTimesList input[type="radio"] {
+        display: none; /* Hide actual radio */
+    }
+
+    #availableTimesList input[type="radio"]:checked + label {
+        /* Use brand color for selected state */
+        background-color: #d1fae5; /* brand-100 (emerald) */
+        border-color: #10b981; /* brand-500 */
+        color: #047857; /* brand-700 */
+        font-weight: 500; /* font-medium */
+    }
+    .dark #availableTimesList input[type="radio"]:checked + label {
+        /* Use brand color for selected state in dark mode */
+        background-color: #065f46; /* dark:bg-brand-800 */
+        border-color: #10b981; /* dark:border-brand-500 */
+        color: #a7f3d0; /* dark:text-brand-200 */
+    }
+
+    #availableTimesList label:hover {
+        border-color: #6ee7b7; /* hover:border-brand-300 */
+    }
+    .dark #availableTimesList label:hover {
+        border-color: #34d399; /* dark:hover:border-brand-400 */
     }
 </style>
 
-<!-- Full-page loading overlay -->
-<div id="bookingLoadingOverlay">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-    <p>Booking your court...</p>
+{# Tailwind-based loading overlay structure - Use zinc dark bg, brand spinner #}
+<div id="bookingLoadingOverlay" class="fixed inset-0 z-50 flex-col items-center justify-center bg-white/90 dark:bg-zinc-800/90 hidden">
+    {# Updated spinner class to use brand color #}
+    <div class="spinner w-16 h-16 border-4 border-brand-500 border-t-transparent border-r-transparent rounded-full animate-spin"></div>
+    <p class="mt-4 text-lg font-medium text-gray-800 dark:text-zinc-200">Booking your court...</p>
 </div>
 
 <script>
@@ -142,33 +220,46 @@
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const minDate = tomorrow.toISOString().split('T')[0];
-        document.getElementById('bookingDate').min = minDate;
+        const bookingDateInput = document.getElementById('bookingDate');
+        if (bookingDateInput) { // Ensure element exists
+             bookingDateInput.min = minDate;
+        }
         
         const courtNameSelect = document.getElementById('courtName');
-        const bookingDateInput = document.getElementById('bookingDate');
         const refreshButton = document.getElementById('refreshAvailableTimes');
         const selectedTimeInput = document.getElementById('selectedTime');
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
         const phoneInput = document.getElementById('phone');
         const playtimeDurationSelect = document.getElementById('playtimeDuration');
+        const bookingForm = document.getElementById('bookingForm');
+        const loadingOverlay = document.getElementById('bookingLoadingOverlay');
         
         // Function to load available times
         async function loadAvailableTimes() {
-            const courtName = courtNameSelect.value;
-            const bookingDate = bookingDateInput.value;
+            const courtName = courtNameSelect ? courtNameSelect.value : null;
+            const bookingDate = bookingDateInput ? bookingDateInput.value : null;
+            const availableTimesList = document.getElementById('availableTimesList');
+            const availableTimesLoading = document.getElementById('availableTimesLoading');
+            const availableTimesError = document.getElementById('availableTimesError');
+
+            // Ensure all required elements exist before proceeding
+            if (!courtNameSelect || !bookingDateInput || !availableTimesList || !availableTimesLoading || !availableTimesError || !selectedTimeInput) {
+                console.error("One or more required elements not found for loading times.");
+                return;
+            }
             
             if (!courtName || !bookingDate) {
-                document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
-                document.getElementById('availableTimesError').style.display = 'none';
+                availableTimesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-zinc-400">Select a court and date to see available times.</p>';
+                availableTimesError.style.display = 'none';
                 selectedTimeInput.value = '';
                 return;
             }
             
             // Show loading indicator
-            document.getElementById('availableTimesLoading').style.display = 'block';
-            document.getElementById('availableTimesError').style.display = 'none';
-            document.getElementById('availableTimesList').innerHTML = '';
+            availableTimesLoading.style.display = 'block';
+            availableTimesError.style.display = 'none';
+            availableTimesList.innerHTML = '';
             
             // Clear selected time
             selectedTimeInput.value = '';
@@ -188,145 +279,175 @@
                 const data = await response.json();
                 
                 // Hide loading indicator
-                document.getElementById('availableTimesLoading').style.display = 'none';
+                availableTimesLoading.style.display = 'none';
                 
-                if (data.status === 'success' && data.times && data.times.length > 0) {
+                if (response.ok && data.status === 'success' && data.times && data.times.length > 0) {
                     // Create HTML for available times
-                    let html = `<p class="text-success">Found ${data.times.length} available times for ${courtName} on ${bookingDate}</p>`;
-                    html += '<div class="row">';
+                    let html = `<p class="text-sm font-medium text-green-600 dark:text-green-400 mb-2">Found ${data.times.length} available times:</p>`;
+                    // Use Tailwind grid for layout
+                    html += '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">'; 
                     
                     data.times.forEach(time => {
                         const [hours, minutes] = time.split(':');
                         const hour = parseInt(hours);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                        const d = new Date(); 
+                        d.setHours(hour, minutes, 0); // Set hours and minutes on a dummy date
+                        const displayTime = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); // Format to locale time (e.g., 9:00 AM)
                         
+                        // Structure for custom radio button appearance - Use zinc dark border, brand focus/hover
                         html += `
-                            <div class="col-md-3 mb-2">
-                                <div class="form-check">
-                                    <input type="radio" class="form-check-input available-time" 
-                                           id="available_${time}" 
-                                           name="available_time" 
-                                           value="${time}"
-                                           data-time="${time}">
-                                    <label class="form-check-label" for="available_${time}">
-                                        ${displayTime}
-                                    </label>
-                                </div>
+                            <div>
+                                <input type="radio" class="available-time sr-only" 
+                                       id="available_${time}" 
+                                       name="available_time" 
+                                       value="${time}">
+                                <label for="available_${time}" 
+                                       class="block py-2 px-3 border border-gray-300 dark:border-zinc-600 rounded-md text-center cursor-pointer transition duration-150 ease-in-out text-sm text-gray-700 dark:text-zinc-300 hover:border-brand-300 dark:hover:border-brand-400">
+                                    ${displayTime}
+                                </label>
                             </div>
                         `;
                     });
                     
-                    html += '</div>';
+                    html += '</div>'; // Close grid
                     
-                    document.getElementById('availableTimesList').innerHTML = html;
+                    availableTimesList.innerHTML = html;
                     
-                    // Add event listeners to radio buttons
-                    document.querySelectorAll('.available-time').forEach(radio => {
+                    // Add event listeners to radio buttons (specifically the labels now)
+                    document.querySelectorAll('#availableTimesList input[type="radio"]').forEach(radio => {
                         radio.addEventListener('change', function() {
                             if (this.checked) {
                                 // Update the hidden input
                                 selectedTimeInput.value = this.value;
+                                
+                                // Update all labels visually - Use brand colors
+                                document.querySelectorAll('#availableTimesList label').forEach(label => {
+                                    label.classList.remove('bg-brand-100', 'border-brand-500', 'text-brand-700', 'font-medium', 'dark:bg-brand-800', 'dark:border-brand-500', 'dark:text-brand-200');
+                                });
+                                // Add checked style to the selected label
+                                const selectedLabel = document.querySelector(`label[for='${this.id}']`);
+                                if (selectedLabel) {
+                                     selectedLabel.classList.add('bg-brand-100', 'border-brand-500', 'text-brand-700', 'font-medium', 'dark:bg-brand-800', 'dark:border-brand-500', 'dark:text-brand-200');
+                                }
                             }
                         });
                     });
                     
-                    // Add note if times were scraped
+                    // Add note about scraped times
+                    const noteDiv = document.createElement('div');
+                    noteDiv.className = 'mt-3 text-xs italic text-gray-500 dark:text-zinc-400';
                     if (data.is_scraped) {
-                        const noteDiv = document.createElement('div');
-                        noteDiv.id = 'timeNote';
-                        noteDiv.className = 'text-info small mt-1';
-                        noteDiv.textContent = 'These are actual available times from the booking system.';
-                        document.getElementById('availableTimesList').appendChild(noteDiv);
+                        noteDiv.textContent = 'Times shown are currently available according to the SF Rec & Park website.';
+                    } else {
+                        noteDiv.textContent = 'These are standard time slots. Actual availability will be checked upon booking attempt.';
                     }
+                    availableTimesList.appendChild(noteDiv);
+
                 } else {
-                    document.getElementById('availableTimesError').style.display = 'block';
-                    document.getElementById('availableTimesList').innerHTML = '';
+                     // Handle errors or no times found
+                    availableTimesError.textContent = data.message || 'No available times found for this court and date, or an error occurred.';
+                    availableTimesError.style.display = 'block';
+                    availableTimesList.innerHTML = ''; // Clear any previous list
                 }
             } catch (error) {
                 console.error('Error loading available times:', error);
-                document.getElementById('availableTimesLoading').style.display = 'none';
-                document.getElementById('availableTimesError').style.display = 'block';
-                document.getElementById('availableTimesList').innerHTML = '';
+                availableTimesLoading.style.display = 'none';
+                availableTimesError.textContent = 'An error occurred while fetching available times. Please try again.';
+                availableTimesError.style.display = 'block';
+                availableTimesList.innerHTML = '';
             }
         }
         
-        // Add event listeners
-        courtNameSelect.addEventListener('change', loadAvailableTimes);
-        bookingDateInput.addEventListener('change', loadAvailableTimes);
-        refreshButton.addEventListener('click', loadAvailableTimes);
+        // Event listeners for court and date changes
+        if (courtNameSelect) {
+             courtNameSelect.addEventListener('change', loadAvailableTimes);
+        }
+       if (bookingDateInput) {
+            bookingDateInput.addEventListener('change', loadAvailableTimes);
+       }
+       if (refreshButton) {
+            refreshButton.addEventListener('click', loadAvailableTimes);
+       }
         
-        // Handle form submission
-        document.getElementById('bookingForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const courtName = courtNameSelect.value;
-            const bookingDate = bookingDateInput.value;
-            const selectedTime = selectedTimeInput.value;
-            const email = emailInput.value;
-            const password = passwordInput.value;
-            const phone = phoneInput.value;
-            const playtimeDuration = parseInt(document.getElementById('playtimeDuration').value);
-            
-            if (!courtName || !bookingDate) {
-                alert('Please select a court and date');
-                return;
-            }
-            
-            if (!selectedTime) {
-                alert('Please select an available time');
-                return;
-            }
-            
-            if (!email || !password || !phone) {
-                alert('Please provide your email, password, and phone number');
-                return;
-            }
-            
-            // Show the loading overlay
-            document.getElementById('bookingLoadingOverlay').style.display = 'flex';
-            
-            try {
-                // Schedule the booking directly
-                const response = await fetch('/schedule-booking', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        court_name: courtName,
-                        booking_time: new Date(`${bookingDate}T${selectedTime}`).toISOString()
-                    })
-                });
+        // Form submission handler
+        if (bookingForm) {
+             bookingForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
                 
-                const data = await response.json();
+                // Show loading overlay
+                if(loadingOverlay) loadingOverlay.style.display = 'flex';
                 
-                // Hide loading overlay
-                document.getElementById('bookingLoadingOverlay').style.display = 'none';
-                
-                if (data.status === 'success') {
-                    // Use the specific message from the backend for all success scenarios
-                    alert(`Booking status: ${data.message}`); 
-                    // Reset form fields except user info (which is now just display)
-                    courtNameSelect.value = '';
-                    bookingDateInput.value = '';
-                    // Reset available times
-                    document.getElementById('availableTimesList').innerHTML = '<p class="text-muted">Select a court and date to see available times.</p>';
-                    document.getElementById('availableTimesError').style.display = 'none';
-                    // Clear selected time
-                    selectedTimeInput.value = '';
-                } else {
-                    // Use the specific error message from the backend
-                    alert(`Booking failed: ${data.message}`);
+                const courtName = courtNameSelect ? courtNameSelect.value : null;
+                const bookingDate = bookingDateInput ? bookingDateInput.value : null;
+                const selectedTime = selectedTimeInput ? selectedTimeInput.value : null;
+                const userEmail = emailInput ? emailInput.value : null;
+                const userPassword = passwordInput ? passwordInput.value : null;
+                const userPhone = phoneInput ? phoneInput.value : null;
+                const playtimeDuration = playtimeDurationSelect ? playtimeDurationSelect.value : null;
+
+                // Basic validation
+                if (!courtName || !bookingDate || !selectedTime || !userEmail || !userPassword || !userPhone || !playtimeDuration) {
+                    alert('Please fill out all fields and select a time.');
+                    if(loadingOverlay) loadingOverlay.style.display = 'none';
+                    return;
                 }
-            } catch (error) {
-                // Hide loading overlay if there's an error
-                document.getElementById('bookingLoadingOverlay').style.display = 'none';
-                console.error('Error submitting booking:', error);
-                alert('Error submitting booking. Please try again.');
-            }
-        });
+                
+                const localBookingDateTime = new Date(`${bookingDate}T${selectedTime}:00`);
+                const bookingTimeISO = localBookingDateTime.toISOString();
+
+                // --- Save Booking Info before scheduling --- 
+                try {
+                    const saveInfoResponse = await fetch('/save-booking-info', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            court_name: courtName, // Include court preference
+                            rec_account_email: userEmail,
+                            rec_account_password: userPassword,
+                            phone_number: userPhone,
+                            playtime_duration: parseInt(playtimeDuration) // Send as integer
+                        })
+                    });
+                    const saveInfoData = await saveInfoResponse.json();
+                    if (!saveInfoResponse.ok || saveInfoData.status !== 'success') {
+                        console.warn('Failed to save user info:', saveInfoData.message);
+                        // Don't necessarily stop the booking, but log it
+                    }
+                } catch (saveError) {
+                    console.error('Error saving user info:', saveError);
+                }
+                // --- End Save Booking Info ---
+
+                // --- Schedule Booking --- 
+                try {
+                    const scheduleResponse = await fetch('/schedule-booking', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            court_name: courtName,
+                            booking_time: bookingTimeISO // Send the ISO string
+                        })
+                    });
+                    
+                    const scheduleData = await scheduleResponse.json();
+                    
+                    // Hide loading overlay
+                    if(loadingOverlay) loadingOverlay.style.display = 'none';
+                    
+                    if (scheduleResponse.ok && scheduleData.status === 'success') {
+                        alert(scheduleData.message || 'Booking scheduled successfully!'); 
+                    } else {
+                        alert(`Booking failed: ${scheduleData.message || 'Unknown error'}`);
+                    }
+                    
+                } catch (scheduleError) {
+                    console.error('Error scheduling booking:', scheduleError);
+                     if(loadingOverlay) loadingOverlay.style.display = 'none';
+                    alert('An error occurred while trying to schedule the booking. Please check console.');
+                }
+                // --- End Schedule Booking --- 
+            });
+        }
     });
 </script>
 {% endblock %}
