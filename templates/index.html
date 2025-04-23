@@ -33,20 +33,28 @@
                 {# Booking Date - Use zinc for dark bg/border, brand for focus #}
                 <div>
                     <label for="bookingDate" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Booking Date</label>
-                    <input type="date" id="bookingDate" name="bookingDate" required
-                           max="9999-12-31"
+                    <input type="text" id="bookingDate" name="bookingDate" required 
+                           placeholder="Select booking date"
                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
                 </div>
 
                 {# Duration - Use zinc for dark bg/border, brand for focus (MOVED HERE) #}
                 <div>
                     <label for="playtimeDuration" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Playtime Duration</label>
-                    <select id="playtimeDuration" name="playtimeDuration" required
-                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
-                        {# Use user_info variable #}
-                        <option value="60" {% if not user_info or user_info.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
-                        <option value="90" {% if user_info and user_info.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
-                    </select>
+                    <div class="relative mt-1">
+                        <select id="playtimeDuration" name="playtimeDuration" required
+                                class="appearance-none block w-full py-2 pl-3 pr-10 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                            {# Use user_info variable #}
+                            <option value="60" {% if not user_info or user_info.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
+                            <option value="90" {% if user_info and user_info.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-zinc-400">
+                            {# Heroicon: chevron-down #}
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.23 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
                     <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">How long you want to play.</p>
                 </div>
 
@@ -105,6 +113,23 @@
         </div>
     </div>
 </div>
+
+{# --- ADDED: Booking Result Overlay --- #}
+<div id="bookingResultOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-white dark:bg-zinc-800 rounded-lg shadow-xl p-8 max-w-sm w-full text-center">
+        {# Icon Circle - Color changes dynamically #}
+        <div id="resultIconCircle" class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center">
+            {# Icon - SVG changes dynamically #}
+            <svg id="resultIconSVG" class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                {# Path will be set by JS #}
+            </svg>
+        </div>
+        {# Message Text #}
+        <p id="resultTextMessage" class="text-lg font-medium text-gray-900 dark:text-white"></p>
+    </div>
+</div>
+{# --- End Booking Result Overlay --- #}
+
 {% endblock %}
 
 {% block scripts %}
@@ -212,13 +237,9 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Set minimum date to tomorrow
         const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setDate(tomorrow.getDate()); // Flatpickr uses 'today' relative to client, adjusted in options
         const minDate = tomorrow.toISOString().split('T')[0];
         const bookingDateInput = document.getElementById('bookingDate');
-        if (bookingDateInput) { 
-             bookingDateInput.min = minDate;
-             // Max is now set in HTML
-        }
         
         const courtNameSelect = document.getElementById('courtName');
         const refreshButton = document.getElementById('refreshAvailableTimes');
@@ -227,6 +248,18 @@
         const playtimeDurationSelect = document.getElementById('playtimeDuration');
         const bookingForm = document.getElementById('bookingForm');
         const loadingOverlay = document.getElementById('bookingLoadingOverlay');
+        
+        // Initialize Flatpickr
+        if (bookingDateInput) {
+            flatpickr(bookingDateInput, {
+                altInput: true, // Show human-friendly date to user
+                altFormat: "F j, Y", // Format for human-friendly date
+                dateFormat: "Y-m-d", // Format submitted to server
+                minDate: "today",    // Minimum selectable date is today
+                // Note: If you need strictly *tomorrow*, use `minDate: new Date().fp_incr(1)`
+                disableMobile: true // Use custom UI on mobile
+            });
+        }
         
         // Function to load available times
         async function loadAvailableTimes() {
@@ -424,19 +457,60 @@
                     if(loadingOverlay) loadingOverlay.style.display = 'none';
                     
                     if (scheduleResponse.ok && scheduleData.status === 'success') {
-                        alert(scheduleData.message || 'Booking scheduled successfully!'); 
+                        // Replace alert with overlay
+                        showBookingResultOverlay(true, scheduleData.message || 'Booking scheduled successfully!'); 
                     } else {
-                        alert(`Booking failed: ${scheduleData.message || 'Unknown error'}`);
+                        // Replace alert with overlay
+                        showBookingResultOverlay(false, `Booking failed: ${scheduleData.message || 'Unknown error'}`);
                     }
                     
                 } catch (scheduleError) {
                     console.error('Error scheduling booking:', scheduleError);
                      if(loadingOverlay) loadingOverlay.style.display = 'none';
-                    alert('An error occurred while trying to schedule the booking. Please check console.');
+                     // Replace alert with overlay
+                    showBookingResultOverlay(false, 'An error occurred while trying to schedule the booking. Please check console.');
                 }
                 // --- End Schedule Booking --- 
             });
         }
+
+        // --- Booking Result Overlay Logic ---
+        const bookingResultOverlay = document.getElementById('bookingResultOverlay');
+        const resultIconCircle = document.getElementById('resultIconCircle');
+        const resultIconSVG = document.getElementById('resultIconSVG');
+        const resultTextMessage = document.getElementById('resultTextMessage');
+
+        // SVG paths (Heroicons outline)
+        const checkIconPath = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+        const xIconPath = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+
+        function showBookingResultOverlay(isSuccess, message) {
+            // Clear previous classes/content
+            resultIconCircle.classList.remove('bg-green-500', 'bg-red-500');
+
+            if (isSuccess) {
+                resultIconCircle.classList.add('bg-green-500'); // Use Tailwind green
+                resultIconSVG.innerHTML = checkIconPath;
+                resultTextMessage.textContent = message || 'Booking Successful!';
+            } else {
+                resultIconCircle.classList.add('bg-red-500'); // Use Tailwind red
+                resultIconSVG.innerHTML = xIconPath;
+                resultTextMessage.textContent = message || 'An error occurred.';
+            }
+
+            // Show the overlay
+            if(bookingResultOverlay) {
+                 bookingResultOverlay.classList.remove('hidden');
+            }
+        }
+
+        // Hide overlay on click
+        if (bookingResultOverlay) {
+            bookingResultOverlay.addEventListener('click', () => {
+                bookingResultOverlay.classList.add('hidden');
+            });
+        }
+        // --- End Booking Result Overlay Logic ---
     });
 </script>
 {% endblock %}
