@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from court_scraper import update_court_list
 from automation import TennisBooker
-from models import Court, BookingPreference, BookingAttempt
+from models import Court, UserInformation, BookingAttempt
 from database import init_db
 from extensions import scheduler
 import re
@@ -75,13 +75,13 @@ def index():
     tomorrow = now + timedelta(days=1)
     tomorrow_str = tomorrow.strftime('%Y-%m-%d')
     
-    # Get the most recent preferences
-    preferences = BookingPreference.get_latest()
+    # Get the most recent preferences/user info
+    user_info = UserInformation.get_latest()
     
     return render_template('index.html', 
                           courts=courts, 
                           tomorrow_date=tomorrow_str,
-                          preferences=preferences)
+                          user_info=user_info)
 
 @app.route('/courts/refresh', methods=['POST'])
 def refresh_courts():
@@ -109,65 +109,64 @@ def debug_courts():
         logger.error(f"Error in debug courts: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/preferences', methods=['GET', 'POST'])
-def preferences():
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
     if request.method == 'POST':
         try:
-            # Get preferred times from the hidden input (comma-separated string)
-            preferred_times_str = request.form.get('preferred_times', '')
-            preferred_times = preferred_times_str.split(',') if preferred_times_str else []
-            
-            # Filter out any empty strings
-            preferred_times = [time for time in preferred_times if time.strip()]
-            
-            # Ensure all times are in the correct format (HH:MM)
-            for i, time in enumerate(preferred_times):
-                if not time.strip():
-                    continue
-                    
-                # If time doesn't match HH:MM format, log an error
-                if not re.match(r'^\d{2}:\d{2}$', time):
-                    logger.warning(f"Invalid time format: {time}, skipping")
-                    preferred_times[i] = None
-            
-            # Remove any None values
-            preferred_times = [time for time in preferred_times if time is not None]
-            
-            # Get playtime duration (default to 60 minutes)
-            playtime_duration = request.form.get('playtime_duration', '60')
+            email = request.form.get('rec_account_email')
+            password = request.form.get('rec_account_password')
+            phone = request.form.get('phone_number')
+            playtime_duration_str = request.form.get('playtime_duration', '60')
+
+            if not all([email, password, phone]):
+                flash('Email, Password, and Phone Number are required.', 'error')
+                current_user_info = UserInformation.get_latest()
+                return render_template('settings.html', 
+                                     courts=None, 
+                                     user_info=current_user_info) 
+
             try:
-                playtime_duration = int(playtime_duration)
-                # Validate that playtime duration is one of the allowed values
+                playtime_duration = int(playtime_duration_str)
                 if playtime_duration not in [60, 90]:
                     logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
                     playtime_duration = 60
             except (ValueError, TypeError):
-                logger.warning(f"Invalid playtime duration format: {playtime_duration}, defaulting to 60")
+                logger.warning(f"Invalid playtime duration format: {playtime_duration_str}, defaulting to 60")
                 playtime_duration = 60
             
-            pref = BookingPreference(
-                court_name=request.form['court_name'],
-                preferred_days=request.form.getlist('preferred_days'),
-                preferred_times=preferred_times,
-                playtime_duration=playtime_duration,
-                rec_account_email=request.form['rec_account_email'],
-                rec_account_password=request.form['rec_account_password'],
-                phone_number=request.form['phone_number']
-            )
-            pref.save()
-            flash('Preferences saved successfully!', 'success')
-            return redirect(url_for('index'))
-        except Exception as e:
-            logger.error(f"Error saving preferences: {str(e)}")
-            flash('Error saving preferences', 'error')
+            timestamp_to_upsert = datetime.now().isoformat()
+            logging.info(f"APP_UPSERT (Settings): Attempting to upsert user with email: {email}")
+            logging.info(f"APP_UPSERT (Settings): Password: {'*' * len(password) if password else 'None'}")
+            logging.info(f"APP_UPSERT (Settings): Phone: {phone}")
+            logging.info(f"APP_UPSERT (Settings): Duration: {playtime_duration}")
+            logging.info(f"APP_UPSERT (Settings): Timestamp: {timestamp_to_upsert}")
 
-    # Get the most recent preferences and courts
-    current_preferences = BookingPreference.get_latest()
-    courts = Court.get_all_active()
-    
-    return render_template('preferences.html', 
-                         courts=courts, 
-                         preferences=current_preferences)
+            upsert_result = UserInformation.upsert_by_email(
+                rec_account_email=email,
+                rec_account_password=password, 
+                phone_number=phone,
+                playtime_duration=playtime_duration,
+                created_at=timestamp_to_upsert
+            )
+            logging.info(f"APP_UPSERT (Settings): Result from upsert_by_email: {upsert_result}")
+
+            if upsert_result:
+                flash('Settings saved successfully!', 'success')
+                return redirect(url_for('index')) 
+            else:
+                 flash('Error saving settings. Please try again.', 'error')
+                 # Fall through handled below
+
+        except Exception as e:
+            logger.error(f"Error processing settings form: {str(e)}", exc_info=True)
+            flash('An unexpected error occurred while saving settings.', 'error')
+            # Fall through handled below
+
+    # GET request or POST request failed/fell through
+    current_user_info = UserInformation.get_latest()
+    return render_template('settings.html', 
+                         courts=None, 
+                         user_info=current_user_info)
 
 @app.route('/schedule-booking', methods=['POST'])
 def schedule_booking():
@@ -175,6 +174,17 @@ def schedule_booking():
         data = request.get_json()
         booking_time_str = data.get('booking_time')
         court_name = data.get('court_name')
+
+        # Get email for the attempt
+        latest_user_for_email = UserInformation.get_latest()
+        if not latest_user_for_email or not latest_user_for_email.get('rec_account_email'):
+            logger.error("SCHEDULE_BOOKING: Cannot proceed without a user email. No recent user info found or email missing.")
+            return jsonify({
+                'status': 'error',
+                'message': 'User information not found or incomplete. Please ensure settings are saved.'
+            }), 400
+        user_email_for_attempt = latest_user_for_email['rec_account_email']
+        logger.info(f"SCHEDULE_BOOKING: Associating attempt with email: {user_email_for_attempt}")
 
         # Parse the ISO string as SF local time
         sf_timezone = ZoneInfo("America/Los_Angeles")
@@ -185,7 +195,7 @@ def schedule_booking():
 
         # For comparison, set both times to start of day
         booking_date = datetime(
-            booking_time.year, booking_time.month, booking_time.day, 
+            booking_time.year, booking_time.month, booking_time.day,
             tzinfo=sf_timezone
         )
         today = datetime(
@@ -203,14 +213,16 @@ def schedule_booking():
         # Create booking attempt record
         attempt = BookingAttempt(
             court_name=court_name,
-            booking_time=booking_time
+            booking_time=booking_time,
+            user_email=user_email_for_attempt
         )
         attempt_data = attempt.save()
 
         if not attempt_data:
+            logger.error(f"SCHEDULE_BOOKING: Failed to save booking attempt for {user_email_for_attempt}")
             return jsonify({
                 'status': 'error',
-                'message': 'Failed to create booking attempt'
+                'message': 'Failed to create booking attempt record'
             }), 500
 
         # Calculate days difference between booking date and today
@@ -218,35 +230,64 @@ def schedule_booking():
 
         # If booking is within a week, attempt to book immediately
         if days_difference <= 7:
-            logger.info(f"Booking date is within a week ({days_difference} days from today). Attempting immediate booking.")
-            
-            # Get booking preferences
-            pref = BookingPreference.get_latest()
-            
-            if not pref:
+            logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Date within 7 days. Attempting immediate booking.")
+
+            # Get the full attempt record first (includes user_email)
+            attempt_record = BookingAttempt.get_by_id(attempt_data["id"])
+            if not attempt_record:
+                 logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Failed to retrieve attempt record after saving.")
+                 # Update status? Unlikely to happen, but safer.
+                 BookingAttempt.update_status(attempt_data["id"], 'failed', "Internal error: Could not retrieve attempt record")
+                 return jsonify({
+                    'status': 'error',
+                    'message': 'Internal error retrieving booking details.'
+                 }), 500
+
+            email = attempt_record.get('user_email')
+            if not email:
+                logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Booking attempt record is missing user_email.")
+                BookingAttempt.update_status(attempt_data["id"], 'failed', "Internal error: Attempt record missing email")
+                return jsonify({
+                   'status': 'error',
+                   'message': 'Internal error: Booking attempt missing user email.'
+                }), 500
+
+            logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Fetching credentials for user: {email}")
+            user_info = UserInformation.get_by_email(email)
+
+            if not user_info:
+                logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - No user information found for email {email}. Cannot book.")
+                BookingAttempt.update_status(attempt_data["id"], 'failed', f"User info not found for email {email}")
                 return jsonify({
                     'status': 'error',
-                    'message': 'No booking preferences found. Please set your preferences first.'
+                    'message': f'No user information found for {email}. Please set your settings first.'
                 }), 400
-            
-            # Get the email and password from preferences
-            email = pref['rec_account_email']
-            password = pref['rec_account_password']
-            
-            # Initialize TennisBooker with credentials
-            booker = TennisBooker(email, password)
-            
-            # Get playtime duration (default to 60 minutes if not set or invalid)
-            playtime_duration = pref.get('playtime_duration', 60)
+
+            # Get the password from user info
+            password = user_info.get('rec_account_password')
+            if not password:
+                 logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - User {email} record found, but password is missing.")
+                 BookingAttempt.update_status(attempt_data["id"], 'failed', f"Password missing for user {email}")
+                 return jsonify({
+                     'status': 'error',
+                     'message': f'Password not found for user {email}. Please update settings.'
+                 }), 400
+
+            # Initialize TennisBooker with specific user's credentials
+            logger.debug(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Initializing TennisBooker for {email}.")
+            booker = TennisBooker(email, password, user_id=email)
+
+            # Get playtime duration (default to 60 minutes if not set or invalid in user_info)
+            playtime_duration = user_info.get('playtime_duration', 60)
             if playtime_duration not in [60, 90]:
-                logger.warning(f"Invalid playtime duration: {playtime_duration}, defaulting to 60")
+                logger.warning(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Invalid playtime duration {playtime_duration} for user {email}, defaulting to 60")
                 playtime_duration = 60
-            
+
             # Attempt booking
-            logger.info(f"Attempting immediate booking for attempt {attempt_data['id']}...")
+            logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Calling booker.book_court...")
             success, error = booker.book_court(
-                court_name, 
-                booking_time, 
+                court_name,
+                booking_time,
                 playtime_duration=playtime_duration
             )
             
@@ -258,14 +299,14 @@ def schedule_booking():
             BookingAttempt.update_status(attempt_data["id"], status, error_message)
             
             if success:
-                logger.info(f"Immediate booking successful for attempt {attempt_data['id']}")
+                logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Immediate booking successful for {email}")
                 return jsonify({
                     'status': 'success',
                     'message': 'Court booked successfully'
                 })
             else:
                 # Immediate booking failed, schedule it for the future as a backup
-                logger.warning(f"Immediate booking failed for attempt {attempt_data['id']}: {error}. Scheduling for the future.")
+                logger.warning(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Immediate booking failed for {email}: {error}. Scheduling for the future.")
                 # Schedule the booking attempt with a unique job ID
                 job_id = f'booking_{attempt_data["id"]}_{booking_time.strftime("%Y%m%d_%H%M")}'
                 try:
@@ -279,7 +320,7 @@ def schedule_booking():
                     )
                     # Update status to 'scheduled' since immediate failed but scheduling worked
                     # Keep the original error message about the immediate failure
-                    logger.info(f"Successfully scheduled future booking job {job_id} despite immediate failure.")
+                    logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Successfully scheduled future booking job {job_id} despite immediate failure.")
                     BookingAttempt.update_status(attempt_data["id"], 'scheduled', error_message) 
                     # Return success status but with a specific message
                     return jsonify({
@@ -289,7 +330,7 @@ def schedule_booking():
                 except Exception as scheduler_error:
                     # Immediate booking failed AND scheduling failed
                     full_error = f"Immediate fail: {error_message}. Scheduler fail: {str(scheduler_error)}"
-                    logger.error(f"Immediate booking failed AND scheduler error for attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
+                    logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Immediate booking failed AND scheduler error for attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
                     BookingAttempt.update_status(attempt_data["id"], 'failed', full_error)
                     return jsonify({
                         'status': 'error',
@@ -308,7 +349,7 @@ def schedule_booking():
                 id=job_id,
                 replace_existing=True
             )
-            logger.info(f"Successfully scheduled future booking job {job_id}.")
+            logger.info(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Successfully scheduled future booking job {job_id}.")
             # Ensure attempt status is 'scheduled'
             BookingAttempt.update_status(attempt_data["id"], 'scheduled') 
             return jsonify({
@@ -316,7 +357,7 @@ def schedule_booking():
                 'message': 'Booking successfully scheduled for the future.' # Provide specific message
                 })
         except Exception as scheduler_error:
-            logger.error(f"Scheduler error for future booking attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
+            logger.error(f"SCHEDULE_BOOKING: Attempt {attempt_data['id']} - Scheduler error for future booking attempt {attempt_data['id']}: {str(scheduler_error)}", exc_info=True)
             BookingAttempt.update_status(attempt_data["id"], 'failed', f"Failed to schedule: {str(scheduler_error)}")
             return jsonify({
                 'status': 'error',
@@ -440,17 +481,17 @@ def get_available_times_for_preferences():
         tomorrow = now + timedelta(days=1)
         tomorrow_str = tomorrow.strftime('%Y-%m-%d')
         
-        # Get the most recent preferences to use credentials
-        pref = BookingPreference.get_latest()
+        # Get the most recent user info to use credentials
+        user_info = UserInformation.get_latest()
         
-        if not pref:
+        if not user_info:
             return jsonify({
                 'status': 'error',
-                'message': 'No booking preferences found. Please set your preferences first.'
+                'message': 'No user information found. Please set your settings first.'
             }), 400
             
         # Initialize TennisBooker with credentials
-        booker = TennisBooker(pref['rec_account_email'], pref['rec_account_password'])
+        booker = TennisBooker(user_info['rec_account_email'], user_info['rec_account_password'])
         
         # Get available times
         logger.info(f"Getting available times for preferences: {court_name} on {tomorrow_str}")
@@ -475,7 +516,7 @@ def get_available_times_for_preferences():
 
 @app.route('/save-booking-info', methods=['POST'])
 def save_booking_info():
-    """Save the user's booking information to the preferences table"""
+    """Save the user's booking information to the user info table"""
     try:
         data = request.get_json()
         court_name = data.get('court_name')
@@ -484,11 +525,11 @@ def save_booking_info():
         phone_number = data.get('phone_number')
         playtime_duration = data.get('playtime_duration', 60)
         
-        # Validate required fields
-        if not all([court_name, rec_account_email, rec_account_password, phone_number]):
+        # Validate required fields (excluding court_name for this specific upsert)
+        if not all([rec_account_email, rec_account_password, phone_number]):
             return jsonify({
                 'status': 'error',
-                'message': 'All fields are required'
+                'message': 'Email, Password, and Phone Number are required'
             }), 400
         
         # Validate playtime duration
@@ -501,41 +542,37 @@ def save_booking_info():
             logger.warning(f"Invalid playtime duration format. Defaulting to 60 minutes.")
             playtime_duration = 60
         
-        # Get the latest preferences to maintain the preferred days and times
-        current_preferences = BookingPreference.get_latest()
-        
-        # Use existing values or empty lists if no preferences exist
-        preferred_days = current_preferences.get('preferred_days', []) if current_preferences else []
-        preferred_times = current_preferences.get('preferred_times', []) if current_preferences else []
-        
-        # Create a new booking preference
-        pref = BookingPreference(
-            court_name=court_name,
-            preferred_days=preferred_days,
-            preferred_times=preferred_times,
-            playtime_duration=playtime_duration,
+        timestamp_to_upsert = datetime.now().isoformat()
+        logging.info(f"APP_UPSERT (SaveInfo): Attempting to upsert user with email: {rec_account_email}")
+        logging.info(f"APP_UPSERT (SaveInfo): Password: {'*' * len(rec_account_password) if rec_account_password else 'None'}")
+        logging.info(f"APP_UPSERT (SaveInfo): Phone: {phone_number}")
+        logging.info(f"APP_UPSERT (SaveInfo): Duration: {playtime_duration}")
+        logging.info(f"APP_UPSERT (SaveInfo): Timestamp: {timestamp_to_upsert}")
+
+        upsert_result = UserInformation.upsert_by_email(
             rec_account_email=rec_account_email,
-            rec_account_password=rec_account_password,
-            phone_number=phone_number
+            rec_account_password=rec_account_password, 
+            phone_number=phone_number,
+            playtime_duration=playtime_duration,
+            created_at=timestamp_to_upsert
         )
+        logging.info(f"APP_UPSERT (SaveInfo): Result from upsert_by_email: {upsert_result}")
         
-        # Save to database
-        result = pref.save()
-        
-        if not result:
+        if not upsert_result:
+            logger.error(f"APP_UPSERT (SaveInfo): upsert_by_email failed for {rec_account_email}")
             return jsonify({
                 'status': 'error',
-                'message': 'Failed to save booking information'
+                'message': 'Failed to save user information'
             }), 500
         
-        logger.info(f"Successfully saved booking information for {rec_account_email}")
+        logger.info(f"Successfully saved user information for {rec_account_email} via save-booking-info")
         return jsonify({
             'status': 'success',
-            'message': 'Booking information saved successfully'
+            'message': 'User information saved successfully'
         })
         
     except Exception as e:
-        logger.error(f"Error saving booking information: {str(e)}")
+        logger.error(f"Error saving user information via save-booking-info: {str(e)}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)

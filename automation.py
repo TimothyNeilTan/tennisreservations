@@ -126,7 +126,7 @@ class TennisBooker:
                 court_containers = page.query_selector_all('div.rounded-xl.border.border-gray-200.p-3')
                 
                 # Save HTML for debugging
-                page.screenshot(path="debug_court_listing.png")
+                # page.screenshot(path="debug_court_listing.png")
                 
                 for container in court_containers:
                     court_name_elem = container.query_selector('p.text-\\[1rem\\].font-medium.text-black.md\\:text-\\[1\\.125rem\\].mb-1')

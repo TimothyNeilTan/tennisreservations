@@ -10,63 +10,57 @@
         </div>
         <div class="px-6 py-6">
             <form id="bookingForm" class="space-y-6">
-                {# Court Selection - Use zinc for dark bg/border, brand for focus #}
+                {# Court Selection - Add wrapper and custom arrow #}
                 <div>
                     <label for="courtName" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Court Name</label>
-                    <select id="courtName" name="courtName" required 
-                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
-                        <option value="">Select a court</option>
-                        {% for court in courts %}
-                        <option value="{{ court.name }}">{{ court.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="relative mt-1">
+                        <select id="courtName" name="courtName" required 
+                                class="appearance-none block w-full py-2 pl-3 pr-10 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                            <option value="">Select a court</option>
+                            {% for court in courts %}
+                            <option value="{{ court.name }}">{{ court.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-zinc-400">
+                            {# Heroicon: chevron-down #}
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.23 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
 
                 {# Booking Date - Use zinc for dark bg/border, brand for focus #}
                 <div>
                     <label for="bookingDate" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Booking Date</label>
-                    <input type="date" id="bookingDate" name="bookingDate" required 
+                    <input type="date" id="bookingDate" name="bookingDate" required
+                           max="9999-12-31"
                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
                 </div>
 
-                {# User Info Section - Use zinc for dark border #}
+                {# Duration - Use zinc for dark bg/border, brand for focus (MOVED HERE) #}
+                <div>
+                    <label for="playtimeDuration" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Playtime Duration</label>
+                    <select id="playtimeDuration" name="playtimeDuration" required
+                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
+                        {# Use user_info variable #}
+                        <option value="60" {% if not user_info or user_info.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
+                        <option value="90" {% if user_info and user_info.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">How long you want to play.</p>
+                </div>
+
+                {# User Info Section - Now only contains Email #}
                 <div class="border border-gray-200 dark:border-zinc-700 rounded-md p-4 space-y-4">
                     <h5 class="text-lg font-medium text-gray-900 dark:text-white">User Information</h5>
                     {# Email - Use zinc for dark bg/border, brand for focus #}
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Email Address</label>
                         <input type="email" id="email" name="email" placeholder="user@example.com" required
-                               value="{% if preferences and preferences.rec_account_email %}{{ preferences.rec_account_email }}{% endif %}"
+                               {# Use user_info variable #}
+                               value="{{ user_info.rec_account_email if user_info else '' }}"
                                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
                         <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your SF Rec & Park account email.</p>
-                    </div>
-                    
-                    {# Password - Use zinc for dark bg/border, brand for focus #}
-                    <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Password</label>
-                        <input type="password" id="password" name="password" required
-                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your SF Rec & Park account password.</p>
-                    </div>
-                    
-                    {# Phone - Use zinc for dark bg/border, brand for focus #}
-                    <div>
-                        <label for="phone" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Phone Number</label>
-                        <input type="tel" id="phone" name="phone" placeholder="(123) 456-7890" required
-                               value="{% if preferences and preferences.phone_number %}{{ preferences.phone_number }}{% endif %}"
-                               class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">Your phone number for booking notifications.</p>
-                    </div>
-                    
-                    {# Duration - Use zinc for dark bg/border, brand for focus #}
-                    <div>
-                        <label for="playtimeDuration" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Playtime Duration</label>
-                        <select id="playtimeDuration" name="playtimeDuration" required
-                                class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-zinc-700 dark:border-zinc-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm">
-                            <option value="60" {% if not preferences or preferences.playtime_duration == 60 %}selected{% endif %}>60 minutes</option>
-                            <option value="90" {% if preferences and preferences.playtime_duration == 90 %}selected{% endif %}>90 minutes</option>
-                        </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-zinc-400">How long you want to play.</p>
                     </div>
                 </div>
 
@@ -221,16 +215,15 @@
         tomorrow.setDate(tomorrow.getDate() + 1);
         const minDate = tomorrow.toISOString().split('T')[0];
         const bookingDateInput = document.getElementById('bookingDate');
-        if (bookingDateInput) { // Ensure element exists
+        if (bookingDateInput) { 
              bookingDateInput.min = minDate;
+             // Max is now set in HTML
         }
         
         const courtNameSelect = document.getElementById('courtName');
         const refreshButton = document.getElementById('refreshAvailableTimes');
         const selectedTimeInput = document.getElementById('selectedTime');
         const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const phoneInput = document.getElementById('phone');
         const playtimeDurationSelect = document.getElementById('playtimeDuration');
         const bookingForm = document.getElementById('bookingForm');
         const loadingOverlay = document.getElementById('bookingLoadingOverlay');
@@ -381,12 +374,10 @@
                 const bookingDate = bookingDateInput ? bookingDateInput.value : null;
                 const selectedTime = selectedTimeInput ? selectedTimeInput.value : null;
                 const userEmail = emailInput ? emailInput.value : null;
-                const userPassword = passwordInput ? passwordInput.value : null;
-                const userPhone = phoneInput ? phoneInput.value : null;
                 const playtimeDuration = playtimeDurationSelect ? playtimeDurationSelect.value : null;
 
                 // Basic validation
-                if (!courtName || !bookingDate || !selectedTime || !userEmail || !userPassword || !userPhone || !playtimeDuration) {
+                if (!courtName || !bookingDate || !selectedTime || !userEmail || !playtimeDuration) {
                     alert('Please fill out all fields and select a time.');
                     if(loadingOverlay) loadingOverlay.style.display = 'none';
                     return;
@@ -402,9 +393,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             court_name: courtName, // Include court preference
-                            rec_account_email: userEmail,
-                            rec_account_password: userPassword,
-                            phone_number: userPhone,
+                            rec_account_email: userEmail, // Send only email
                             playtime_duration: parseInt(playtimeDuration) // Send as integer
                         })
                     });

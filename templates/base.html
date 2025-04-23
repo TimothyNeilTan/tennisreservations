@@ -22,6 +22,20 @@
     {# --- End Tailwind Configuration --- #}
     <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+    {# --- ADDED: Style for flash message fade out --- #}
+    <style>
+        .flash-fade-out-up {
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out, max-height 0.5s ease-out, padding 0.5s ease-out, margin 0.5s ease-out, border-width 0.5s ease-out;
+            opacity: 0;
+            transform: translateY(-100%); /* Move up by its own height */
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            margin-bottom: 0;
+            border-width: 0; /* Hide border during transition */
+        }
+    </style>
 </head>
 {# Updated body classes for dark heather grey (zinc) #}
 <body class="bg-gray-100 text-gray-900 dark:bg-zinc-900 dark:text-zinc-100 font-sans">
@@ -35,10 +49,17 @@
                         <span>Tennis Booker</span>
                     </a>
                 </div>
-                <div class="hidden md:block">
-                    <div class="ml-10 flex items-baseline space-x-4">
-                        <a href="{{ url_for('index') }}" class="text-gray-300 hover:bg-zinc-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                        <a href="{{ url_for('preferences') }}" class="text-gray-300 hover:bg-zinc-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Preferences</a>
+                <div class="hidden sm:ml-6 sm:block">
+                    <div class="flex space-x-4">
+                        {# Current: "#", Default: "text-gray-300 hover:bg-zinc-700 hover:text-white" #}
+                        {# Update links to use url_for and correct names #}
+                        {# Apply active class based on current endpoint #}
+                        <a href="{{ url_for('index') }}" 
+                           class="{% if request.endpoint == 'index' %}bg-zinc-900 text-white{% else %}text-gray-300 hover:bg-zinc-700 hover:text-white{% endif %} rounded-md px-3 py-2 text-sm font-medium"
+                           {% if request.endpoint == 'index' %}aria-current="page"{% endif %}>Booking</a>
+                        <a href="{{ url_for('settings') }}" 
+                           class="{% if request.endpoint == 'settings' %}bg-zinc-900 text-white{% else %}text-gray-300 hover:bg-zinc-700 hover:text-white{% endif %} rounded-md px-3 py-2 text-sm font-medium"
+                           {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}>Settings</a>
                     </div>
                 </div>
                 {# Mobile menu button #}
@@ -56,21 +77,29 @@
             </div>
         </div>
 
-        {# Mobile menu, updated background #}
-        <div class="md:hidden hidden" id="mobile-menu">
-            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-800 dark:bg-zinc-800">
-                <a href="{{ url_for('index') }}" class="text-gray-300 hover:bg-zinc-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Home</a>
-                <a href="{{ url_for('preferences') }}" class="text-gray-300 hover:bg-zinc-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Preferences</a>
+        {# Mobile menu, show/hide based on menu state. #}
+        <div class="sm:hidden" id="mobile-menu">
+            <div class="space-y-1 px-2 pt-2 pb-3">
+                {# Current: "bg-zinc-900 text-white", Default: "text-gray-300 hover:bg-zinc-700 hover:text-white" #}
+                {# Update links for mobile menu #}
+                {# Apply active class based on current endpoint #}
+                <a href="{{ url_for('index') }}" 
+                   class="{% if request.endpoint == 'index' %}bg-zinc-900 text-white{% else %}text-gray-300 hover:bg-zinc-700 hover:text-white{% endif %} block rounded-md px-3 py-2 text-base font-medium"
+                   {% if request.endpoint == 'index' %}aria-current="page"{% endif %}>Booking</a>
+                <a href="{{ url_for('settings') }}" 
+                   class="{% if request.endpoint == 'settings' %}bg-zinc-900 text-white{% else %}text-gray-300 hover:bg-zinc-700 hover:text-white{% endif %} block rounded-md px-3 py-2 text-base font-medium"
+                   {% if request.endpoint == 'settings' %}aria-current="page"{% endif %}>Settings</a>
             </div>
         </div>
     </nav>
 
-    {# Updated container and flashed messages #}
-    <div class="container mx-auto mt-6 px-4 sm:px-6 lg:px-8">
+    {# Updated container and flashed messages - Reduced top margin #}
+    <div class="container mx-auto mt-5 px-4 sm:px-6 lg:px-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="p-4 mb-4 text-sm rounded-lg 
+                    {# ADDED overflow-hidden class for transition #}
+                    <div class="p-4 mb-4 text-sm rounded-lg overflow-hidden 
                         {% if category == 'success' %}
                             bg-green-100 text-green-700 dark:bg-zinc-700 dark:text-green-300 
                         {% elif category == 'error' %}
@@ -101,6 +130,20 @@
                 // Toggle icons (optional, requires targeting svgs)
             });
         }
+        
+        // Auto-hide success flash messages
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // Find alerts specifically marked for success (using bg-green-100 as the marker)
+            const successAlerts = document.querySelectorAll('.bg-green-100'); 
+            if (successAlerts) {
+                successAlerts.forEach(alert => {
+                    setTimeout(() => {
+                        // Add the class that triggers the fade-up animation
+                        alert.classList.add('flash-fade-out-up'); 
+                    }, 3500); // Start hiding after 3.5 seconds
+                });
+            }
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>
