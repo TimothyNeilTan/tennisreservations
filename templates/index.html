@@ -457,18 +457,21 @@
                     if(loadingOverlay) loadingOverlay.style.display = 'none';
                     
                     if (scheduleResponse.ok && scheduleData.status === 'success') {
-                        // Replace alert with overlay
-                        showBookingResultOverlay(true, scheduleData.message || 'Booking scheduled successfully!'); 
+                        // Use 'success' status
+                        showBookingResultOverlay('success', scheduleData.message || 'Booking scheduled successfully!'); 
+                    } else if (scheduleResponse.ok && scheduleData.status === 'scheduled') { // ADDED: Check for scheduled status
+                        // Use 'scheduled' status
+                         showBookingResultOverlay('scheduled', scheduleData.message || 'Booking scheduled successfully!'); 
                     } else {
-                        // Replace alert with overlay
-                        showBookingResultOverlay(false, `Booking failed: ${scheduleData.message || 'Unknown error'}`);
+                        // Use 'error' status
+                        showBookingResultOverlay('error', `Booking failed: ${scheduleData.message || 'Unknown error'}`);
                     }
                     
                 } catch (scheduleError) {
                     console.error('Error scheduling booking:', scheduleError);
                      if(loadingOverlay) loadingOverlay.style.display = 'none';
-                     // Replace alert with overlay
-                    showBookingResultOverlay(false, 'An error occurred while trying to schedule the booking. Please check console.');
+                     // Use 'error' status
+                    showBookingResultOverlay('error', 'An error occurred while trying to schedule the booking. Please check console.');
                 }
                 // --- End Schedule Booking --- 
             });
@@ -483,17 +486,23 @@
         // SVG paths (Heroicons outline)
         const checkIconPath = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
         const xIconPath = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+        const hourglassIconPath = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>'; // Simple clock icon as stand-in
 
-        function showBookingResultOverlay(isSuccess, message) {
+        // MODIFIED: Accept status string
+        function showBookingResultOverlay(status, message) {
             // Clear previous classes/content
-            resultIconCircle.classList.remove('bg-green-500', 'bg-red-500');
+            resultIconCircle.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500');
 
-            if (isSuccess) {
-                resultIconCircle.classList.add('bg-green-500'); // Use Tailwind green
+            if (status === 'success') {
+                resultIconCircle.classList.add('bg-green-500'); 
                 resultIconSVG.innerHTML = checkIconPath;
                 resultTextMessage.textContent = message || 'Booking Successful!';
-            } else {
-                resultIconCircle.classList.add('bg-red-500'); // Use Tailwind red
+            } else if (status === 'scheduled') { // ADDED: Scheduled state
+                resultIconCircle.classList.add('bg-yellow-500'); // Use Tailwind yellow
+                resultIconSVG.innerHTML = hourglassIconPath; // Use hourglass/clock icon
+                resultTextMessage.textContent = message || 'Booking Scheduled!';
+            } else { // Default to error
+                resultIconCircle.classList.add('bg-red-500'); 
                 resultIconSVG.innerHTML = xIconPath;
                 resultTextMessage.textContent = message || 'An error occurred.';
             }

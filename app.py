@@ -353,7 +353,7 @@ def schedule_booking():
             # Ensure attempt status is 'scheduled'
             BookingAttempt.update_status(attempt_data["id"], 'scheduled') 
             return jsonify({
-                'status': 'success',
+                'status': 'scheduled',
                 'message': 'Booking successfully scheduled for the future.' # Provide specific message
                 })
         except Exception as scheduler_error:
