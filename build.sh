@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Install Python dependencies
-pip install -r requirements.txt
+#!/bin/bash
 
-# Install Playwright browsers
-python -m playwright install
+echo "Installing Playwright Chromium at runtime..."
+python -m playwright install chromium
 
 #!/usr/bin/env bash
 # exit on error
