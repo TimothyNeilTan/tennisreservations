@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Install Python dependencies
-# pip install -r requirements.txt
+pip install -r requirements.txt
 
 # Install Playwright browsers
-# python -m playwright install chromium
+python -m playwright install
 
 #!/usr/bin/env bash
 # exit on error
