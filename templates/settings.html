@@ -27,6 +27,8 @@
         </div>
         <div class="px-6 py-6">
             <form method="POST" class="space-y-6">
+                {# Manually create hidden input for CSRF token #}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
                 {# REMOVED Preferred Court Section #}
 

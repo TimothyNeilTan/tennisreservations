@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.egg-info/
+.installed.cfg
+*.egg
+instance/
+.webassets-cache/
+.hypothesis/
+*.sqlite3
+*.sqlite3-journal
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Environment variables
+.env
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.swp
+*~ 

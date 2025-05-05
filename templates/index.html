@@ -10,6 +10,8 @@
         </div>
         <div class="px-6 py-6">
             <form id="bookingForm" class="space-y-6">
+                 {# Manually create hidden input for CSRF token #}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {# Court Selection - Add wrapper and custom arrow #}
                 <div>
                     <label for="courtName" class="block text-sm font-medium text-gray-700 dark:text-zinc-300">Court Name</label>
@@ -290,11 +292,23 @@
             // Clear selected time
             selectedTimeInput.value = '';
             
+            // Get CSRF token value from the hidden input field in the form
+            const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+            const csrfToken = csrfTokenInput ? csrfTokenInput.value : null;
+            if (!csrfToken) {
+                console.error("CSRF token not found in the form!");
+                availableTimesLoading.style.display = 'none';
+                availableTimesError.textContent = 'A page configuration error occurred (CSRF token missing). Please refresh.';
+                availableTimesError.style.display = 'block';
+                return; // Stop if token is missing
+            }
+
             try {
                 const response = await fetch('/get-available-times', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // Add the CSRF token header
                     },
                     body: JSON.stringify({
                         court_name: courtName,
@@ -403,6 +417,16 @@
                 // Show loading overlay
                 if(loadingOverlay) loadingOverlay.style.display = 'flex';
                 
+                // Get CSRF token value from the hidden input field
+                const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+                const csrfToken = csrfTokenInput ? csrfTokenInput.value : null;
+                if (!csrfToken) {
+                    console.error("CSRF token not found in the form!");
+                    alert('A page configuration error occurred (CSRF token missing). Please refresh.');
+                    if(loadingOverlay) loadingOverlay.style.display = 'none';
+                    return; // Stop if token is missing
+                }
+
                 const courtName = courtNameSelect ? courtNameSelect.value : null;
                 const bookingDate = bookingDateInput ? bookingDateInput.value : null;
                 const selectedTime = selectedTimeInput ? selectedTimeInput.value : null;
@@ -423,11 +447,14 @@
                 try {
                     const saveInfoResponse = await fetch('/save-booking-info', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken // Add CSRF header here
+                        },
                         body: JSON.stringify({
-                            court_name: courtName, // Include court preference
-                            rec_account_email: userEmail, // Send only email
-                            playtime_duration: parseInt(playtimeDuration) // Send as integer
+                            court_name: courtName,
+                            rec_account_email: userEmail,
+                            playtime_duration: parseInt(playtimeDuration)
                         })
                     });
                     const saveInfoData = await saveInfoResponse.json();
@@ -444,10 +471,13 @@
                 try {
                     const scheduleResponse = await fetch('/schedule-booking', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken // Add CSRF header here too
+                        },
                         body: JSON.stringify({
                             court_name: courtName,
-                            booking_time: bookingTimeISO // Send the ISO string
+                            booking_time: bookingTimeISO
                         })
                     });
                     

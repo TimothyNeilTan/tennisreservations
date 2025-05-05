@@ -69,7 +69,8 @@ class TennisBooker:
         
         # Format target date
         target_date = booking_time
-        target_day = target_date.strftime("%d")
+        # Use str(day) to avoid leading zero (e.g., '8' instead of '08') for matching button text
+        target_day = str(target_date.day)
         target_month = target_date.strftime("%B")
         target_year = target_date.strftime("%Y")
         
@@ -333,7 +334,8 @@ class TennisBooker:
 
         logger.info(f"[TennisBooker.get_available_times] START for '{court_name}' on {date_str}")
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
-        target_day = target_date.strftime("%d")
+        # Use str(day) to avoid leading zero (e.g., '8' instead of '08')
+        target_day = str(target_date.day) 
         target_month = target_date.strftime("%B")  # Full month name
         target_year = target_date.strftime("%Y")
         logger.debug(f"[TennisBooker.get_available_times] Target date parsed: Day={target_day}, Month={target_month}, Year={target_year}")

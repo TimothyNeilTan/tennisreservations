@@ -10,17 +10,36 @@ from models import Court, UserInformation, BookingAttempt
 from database import init_db
 from extensions import scheduler
 import re
+from flask_apscheduler import APScheduler
+from flask_wtf.csrf import CSRFProtect
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev_key")
+
+# --- Secret Key and CSRF Protection Setup ---
+# Use SESSION_SECRET if available, otherwise FLASK_SECRET_KEY, or fallback to dev key
+# IMPORTANT: Set SESSION_SECRET or FLASK_SECRET_KEY environment variable for production!
+secret_key = os.environ.get("SESSION_SECRET") or os.environ.get("FLASK_SECRET_KEY")
+if not secret_key:
+    logger.critical("CRITICAL: Neither SESSION_SECRET nor FLASK_SECRET_KEY environment variables set. Using default dev key. CHANGE THIS FOR PRODUCTION.")
+    secret_key = "default-dev-secret-key-change-me!"
+
+app.config['SECRET_KEY'] = secret_key
+# Flask also uses app.secret_key for sessions, ensure it's set.
+app.secret_key = secret_key 
+
+# Initialize Flask-WTF CSRF protection
+csrf = CSRFProtect(app)
+logger.info("Flask-WTF CSRF protection initialized.")
+# --- End Secret Key and CSRF Protection Setup ---
 
 # Initialize scheduler
-scheduler.init_app(app)
-scheduler.start()
+if not scheduler.running:
+    scheduler.init_app(app)
+    scheduler.start()
 
 def sync_courts():
     """Synchronize courts from scraper with database"""
