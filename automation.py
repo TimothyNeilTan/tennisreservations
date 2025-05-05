@@ -185,7 +185,7 @@ class TennisBooker:
                     login_button.click()
                     page.wait_for_timeout(1000)
                 else:
-                    page.screenshot(path="debug_no_login_button.png")
+                    # page.screenshot(path="debug_no_login_button.png")
                     return False, "Login button not found"
                 
                 # Fill login form
@@ -250,7 +250,7 @@ class TennisBooker:
                     book_button.click()
                     page.wait_for_timeout(1000)
                 else:
-                    page.screenshot(path="debug_no_second_book_button.png")
+                    # page.screenshot(path="debug_no_second_book_button.png")
                     return False, "Second Book button not found"
                 
                 send_code_button = page.wait_for_selector('button[type="submit"]:has-text("Send Code")', 
@@ -303,7 +303,7 @@ class TennisBooker:
                             return True, "Court booked successfully"
                         else:
                             logger.error("Confirm button not found")
-                            page.screenshot(path="debug_no_confirm_button.png")
+                            # page.screenshot(path="debug_no_confirm_button.png")
                             return False, "Confirm button not found"
                     else:
                         logger.error(f"No verification code received after {max_attempts} attempts")
@@ -364,7 +364,7 @@ class TennisBooker:
                         logger.warning("[TennisBooker.get_available_times] Initial button selector found no element.")
                 except Exception as e:
                     logger.error(f"[TennisBooker.get_available_times] Error clicking initial button: {str(e)}", exc_info=True)
-                    page.screenshot(path="button_error.png")
+                    # page.screenshot(path="button_error.png")
                     # Decide if we should re-raise or return empty list
                     return [] # Return empty on error here
                 
@@ -429,7 +429,7 @@ class TennisBooker:
                             logger.info(f"[TennisBooker.get_available_times] Clicked day {target_day} using nth(1) selector.")
                     except Exception as e2:
                         logger.error(f"[TennisBooker.get_available_times] All attempts to click day {target_day} failed: {str(e2)}", exc_info=True)
-                        page.screenshot(path="day_selection_error.png")
+                        # page.screenshot(path="day_selection_error.png")
                         return []
                 
                 # Wait after clicking the day for content to load
@@ -505,7 +505,7 @@ class TennisBooker:
 
             except Exception as e:
                 logger.error(f"[TennisBooker.get_available_times] An unexpected error occurred during scraping: {str(e)}", exc_info=True)
-                page.screenshot(path="scraping_error.png") # Capture state on error
+                # page.screenshot(path="scraping_error.png") # Capture state on error
                 return [] # Return empty list on error
             finally:
                  if browser:
